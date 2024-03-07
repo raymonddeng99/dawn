@@ -1,0 +1,5 @@
+# dune init proj dawn_ocaml
+# OCAMLPARAM: unset
+# Shared cache: disabled
+# Workspace root: /Users/raymonddeng/Desktop/github/dawn/dawn_ocaml
+# Auto-detected concurrency: 8

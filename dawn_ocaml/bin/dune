@@ -1,0 +1,4 @@
+(executable
+ (public_name dawn_ocaml)
+ (name main)
+ (libraries dawn_ocaml))
