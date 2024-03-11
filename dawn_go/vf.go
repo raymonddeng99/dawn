@@ -95,3 +95,32 @@ type feature struct {
 func featurize(state State, action Action) []feature {
     return []feature{{0, 1.0}}
 }
+
+
+// Q-learning with Function Approximation
+func qLearningFuncApprox(gamma float64, episodes int, targetFunc func(theta Theta, s State) float64, observeFunc func(s State, a Action) (State, float64), env Env) Theta {
+    var loop func(theta Theta, s State) Theta
+    loop = func(theta Theta, s State) Theta {
+        a := chooseAction(theta, s)
+        sPrime, r := envStep(env, s, a)
+        target := r + gamma*targetFunc(theta, sPrime)
+        thetaPrime := updateWeights(theta, s, a, target)
+        if terminated(env, sPrime) {
+            return thetaPrime
+        }
+        return loop(thetaPrime, sPrime)
+    }
+
+    initTheta := initializeWeights()
+    var episode func(theta Theta, i int) Theta
+    episode = func(theta Theta, i int) Theta {
+        if i == 0 {
+            return theta
+        }
+        s0 := envReset(env)
+        thetaPrime := loop(theta, s0)
+        return episode(thetaPrime, i-1)
+    }
+
+    return episode(initTheta, episodes)
+}
