@@ -89,3 +89,23 @@ featureIndices :: [(State, Action) -> Double]
 
 featureValue :: State -> Action -> Double
 featureValue state action = sum $ map ($ (state, action)) featureIndices
+
+
+-- Q-learning with Function Approximation
+qLearningFuncApprox :: Double -> Int -> (Theta -> State -> Double) -> (State -> Action -> (State, Reward)) -> Env -> Theta
+qLearningFuncApprox gamma episodes targetFunc observeFunc env = loop initTheta
+  where
+    loop theta s =
+      let a = chooseAction theta s
+          (s', r) = envStep env s a
+          target = r + gamma * targetFunc theta s'
+          theta' = updateWeights theta s a target
+      in if terminated env s' then theta'
+         else loop theta' s'
+
+    initTheta = initializeWeights
+    episode theta 0 = theta
+    episode theta i =
+      let s0 = envReset env
+          theta' = loop theta s0
+      in episode theta' (i - 1)
