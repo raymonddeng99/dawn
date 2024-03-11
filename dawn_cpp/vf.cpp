@@ -6,6 +6,7 @@
 #include <random>
 #include <algorithm>
 #include <numeric>
+#include <functional>
 
 
 // TD with Function Approximation
@@ -85,4 +86,40 @@ void sarsaUpdate(std::unordered_map<std::pair<State, Action>, double>& weights,
 
 std::vector<std::pair<size_t, double>> featurize(const State& state, const Action& action) {
     return {{0, 1.0}};
+}
+
+
+// Q-learning with Function Approximation
+template <typename Theta, typename State, typename Action, typename Reward, typename Env>
+Theta q_learning_func_approx(
+    double gamma,
+    int episodes,
+    std::function<double(const Theta&, const State&)> target_func,
+    std::function<std::pair<State, Reward>(const State&, const Action&)> observe_func,
+    Env& env
+) {
+    auto loop = [&](const Theta& theta, const State& s) -> Theta {
+        Action a = choose_action(theta, s);
+        auto [s_prime, r] = observe_func(s, a);
+        double target = r + gamma * target_func(theta, s_prime);
+        Theta theta_prime = update_weights(theta, s, a, target);
+        if (env.terminated(s_prime)) {
+            return theta_prime;
+        } else {
+            return loop(theta_prime, s_prime);
+        }
+    };
+
+    Theta init_theta = initialize_weights();
+    auto episode = [&](const Theta& theta, int i) -> Theta {
+        if (i == 0) {
+            return theta;
+        } else {
+            State s0 = env.reset();
+            Theta theta_prime = loop(theta, s0);
+            return episode(theta_prime, i - 1);
+        }
+    };
+
+    return episode(init_theta, episodes);
 }
