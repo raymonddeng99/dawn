@@ -57,3 +57,23 @@ let sarsa env max_episodes gamma alpha epsilon =
     episode_loop (env_reset env)
   done;
   weights
+
+(* Q-learning with Function Approximation *)
+let q_learning_func_approx gamma episodes target_func observe_func env =
+  let rec loop theta s =
+    let a = choose_action theta s in
+    let (s', r) = env_step env s a in
+    let target = r +. gamma *. (target_func theta s') in
+    let theta' = update_weights theta s a target in
+    if terminated env s' then theta'
+    else loop theta' s'
+  in
+  let init_theta = initialize_weights () in
+  let rec episode theta i =
+    if i = 0 then theta
+    else
+      let s0 = env_reset env in
+      let theta' = loop theta s0 in
+      episode theta' (i - 1)
+  in
+  episode init_theta episodes
