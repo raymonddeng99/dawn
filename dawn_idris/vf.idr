@@ -66,3 +66,27 @@ sarsaUpdate weights state action reward nextState nextAction gamma alpha =
 
 featurize : State -> Action -> Vect n (State, Action, Double)
 featurize state action = [(state, action, 1.0)] 
+
+
+-- Q-learning with Function Approximation
+qLearningFuncApprox : Double -> Nat -> (Theta -> State -> Double) -> (State -> Action -> (State, Reward)) -> Env -> Theta
+qLearningFuncApprox gamma episodes targetFunc observeFunc env = loop initTheta
+  where
+    loop : Theta -> State -> Theta
+    loop theta s =
+      let a = chooseAction theta s
+          (s', r) = observeFunc s a
+          target = r + gamma * targetFunc theta s'
+          theta' = updateWeights theta s a target
+      in if terminated env s' then theta'
+         else loop theta' s'
+
+    initTheta : Theta
+    initTheta = initializeWeights
+
+    episode : Theta -> Nat -> Theta
+    episode theta 0 = theta
+    episode theta i =
+      let s0 = envReset env
+          theta' = loop theta s0
+      in episode theta' (i - 1)
