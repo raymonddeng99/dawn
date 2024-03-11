@@ -150,3 +150,46 @@ trait Environment {
 fn featurize(state: &State, action: &Action) -> Vec<(usize, f64)> {
     vec![(0, 1.0)]
 }
+
+
+
+// Q-learning with Function Approximation
+fn q_learning_func_approx<Theta, State, Action, Reward, Env>(
+    gamma: f64,
+    episodes: usize,
+    mut target_func: impl FnMut(&Theta, &State) -> f64,
+    mut observe_func: impl FnMut(&State, &Action) -> (State, Reward),
+    env: &mut Env,
+) -> Theta
+where
+    Theta: Clone,
+    State: Clone,
+    Action: Clone,
+    Reward: Clone,
+    Env: EnvironmentTrait<State, Action, Reward>,
+{
+    let mut loop = |theta: &Theta, s: &State| -> Theta {
+        let a = choose_action(theta, s);
+        let (s_prime, r) = observe_func(s, &a);
+        let target = r + gamma * target_func(theta, &s_prime);
+        let theta_prime = update_weights(theta, s, &a, target);
+        if env.terminated(&s_prime) {
+            theta_prime
+        } else {
+            loop(&theta_prime, &s_prime)
+        }
+    };
+
+    let mut init_theta = initialize_weights();
+    let mut episode = |theta: Theta, i: usize| -> Theta {
+        if i == 0 {
+            theta
+        } else {
+            let s0 = env.reset();
+            let theta_prime = loop(&theta, &s0);
+            episode(theta_prime, i - 1)
+        }
+    };
+
+    episode(init_theta, episodes)
+}
