@@ -77,3 +77,19 @@ let q_learning_func_approx gamma episodes target_func observe_func env =
       episode theta' (i - 1)
   in
   episode init_theta episodes
+
+
+(* LS Kalman Filter *)
+let fixed_point_kalman_filter samples =
+  let rec fpkf theta p i =
+    match samples with
+    | [] -> theta
+    | (s, a, q)::rest ->
+      let phi = feature_vector s a in
+      let p' = p -. (mat_mult (mat_mult p (outer_product phi phi)) p) /.
+                    (1. +. (mat_mult (transpose phi) (mat_mult p phi))) in
+      let k = mat_mult p' phi in
+      let theta' = mat_add theta (scalar_mult (q -. (mat_mult (transpose phi) theta)) k) in
+      fpkf theta' p' (i + 1) rest
+  in
+  fpkf zero_vector identity_matrix 0 samples
