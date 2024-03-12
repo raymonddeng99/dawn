@@ -90,3 +90,20 @@ qLearningFuncApprox gamma episodes targetFunc observeFunc env = loop initTheta
       let s0 = envReset env
           theta' = loop theta s0
       in episode theta' (i - 1)
+
+
+
+-- LS Kalman Filter
+fixedPointKalmanFilter : Vect n Double -> Vect n (Double, Double, Double) -> Vect n Double
+fixedPointKalmanFilter {n} theta0 samples =
+  let (theta, _) = foldl step (theta0, idris_mat n n) samples in theta
+  where
+    step : (Vect n Double, Matrix n n Double) -> (Double, Double, Double) -> (Vect n Double, Matrix n n Double)
+    step (theta, p) (s, a, q) =
+      let phi = featureVector s a
+          k = p #> phi #/ (1 + phi `transpose` #> p #> phi)
+          theta' = theta `plus` (k `scalarMult` (q - phi `transpose` #> theta))
+          p' = p `minus` (k #> (phi `transpose` #> p))
+      in (theta', p')
+
+    featureVector : Double -> Double -> Vect n Double
