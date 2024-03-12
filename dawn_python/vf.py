@@ -82,3 +82,21 @@ def q_learning_func_approx(gamma, episodes, target_func, observe_func, env):
         return episode(theta_prime, i - 1)
 
     return episode(init_theta, episodes)
+
+
+# LS Kalman Filter
+def fixed_point_kalman_filter(samples):
+    theta = np.zeros(num_features)
+    P = np.eye(num_features)
+
+    for s, a, q in samples:
+        phi = feature_vector(s, a)
+        k = P @ phi / (1 + phi.T @ P @ phi)
+        q_hat = theta @ phi
+        theta += k * (q - q_hat)
+        P -= k @ phi.T @ P
+
+    return theta
+
+def feature_vector(s, a):
+    return np.zeros(num_features)
