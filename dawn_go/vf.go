@@ -124,3 +124,27 @@ func qLearningFuncApprox(gamma float64, episodes int, targetFunc func(theta Thet
 
     return episode(initTheta, episodes)
 }
+
+
+// LS Kalman Filter
+func fixedPointKalmanFilter(samples []sample) (theta, p mat.Dense) {
+    theta = mat.NewDense(1, 1, nil) // initialize theta as a 1x1 matrix
+    p = mat.NewDense(1, 1, []float64{1.0}) // initialize p as a 1x1 identity matrix
+
+    for _, sample := range samples {
+        s, a, q := sample.state, sample.action, sample.q
+        phi := featureVector(s, a)
+        k := mat.NewDense(1, 1, nil)
+        k.Mul(p, phi)
+        temp := mat.NewDense(1, 1, nil)
+        temp.Mul(phi.T(), p)
+        temp.Mul(temp, phi)
+        temp.AddScalar(1.0)
+        k.DivElemVec(k.RawMatrix().Data, temp.RawMatrix().Data)
+
+        theta.AddScaledVec(q-mat.Dot(phi.T(), theta), k)
+        temp.Mul(k, phi.T())
+        p.Sub(p, temp)
+    }
+    return theta, p
+}
