@@ -123,3 +123,54 @@ Theta q_learning_func_approx(
 
     return episode(init_theta, episodes);
 }
+
+
+
+// LS Kalman Filter
+std::vector<double> fixed_point_kalman_filter(const std::vector<std::tuple<int, int, double>>& samples) {
+    size_t num_features = feature_vector(0, 0).size();
+    std::vector<double> theta(num_features, 0.0);
+    std::vector<std::vector<double>> P(num_features, std::vector<double>(num_features, 0.0));
+
+    for (size_t i = 0; i < num_features; ++i) {
+        P[i][i] = 1.0;
+    }
+
+    for (const auto& [state, action, q] : samples) {
+        std::vector<double> phi = feature_vector(state, action);
+        std::vector<double> k(num_features);
+
+        for (size_t i = 0; i < num_features; ++i) {
+            double sum = 0.0;
+            for (size_t j = 0; j < num_features; ++j) {
+                sum += P[i][j] * phi[j];
+            }
+            k[i] = sum;
+        }
+
+        double k_denom = 1.0 + dot_product(phi, k);
+        for (size_t i = 0; i < num_features; ++i) {
+            k[i] /= k_denom;
+        }
+
+        double q_hat = dot_product(theta, phi);
+        theta = theta + (q - q_hat) * k;
+
+        std::vector<double> temp(num_features);
+        for (size_t i = 0; i < num_features; ++i) {
+            double sum = 0.0;
+            for (size_t j = 0; j < num_features; ++j) {
+                sum += P[j][i] * k[j];
+            }
+            temp[i] = sum;
+        }
+
+        for (size_t i = 0; i < num_features; ++i) {
+            for (size_t j = 0; j < num_features; ++j) {
+                P[i][j] -= temp[i] * phi[j];
+            }
+        }
+    }
+
+    return theta;
+}
