@@ -193,3 +193,72 @@ where
 
     episode(init_theta, episodes)
 }
+
+
+// LS Kalman Filter
+use std::f64;
+
+struct State;
+struct Action;
+
+fn feature_vector(_state: &State, _action: &Action) -> Vec<f64> {
+    vec![1.0, 1.0, 1.0]
+}
+
+fn fixed_point_kalman_filter(samples: &[(State, Action, f64)]) -> Vec<f64> {
+    let num_features = feature_vector(&State, &Action).len();
+    let mut theta = vec![0.0; num_features];
+    let mut p = vec![vec![0.0; num_features]; num_features];
+
+    for i in 0..num_features {
+        p[i][i] = 1.0;
+    }
+
+    for &(ref state, ref action, q) in samples.iter() {
+        let phi = feature_vector(state, action);
+        let mut k = vec![0.0; num_features];
+
+        for i in 0..num_features {
+            let mut sum = 0.0;
+            for j in 0..num_features {
+                sum += p[i][j] * phi[j];
+            }
+            k[i] = sum;
+        }
+
+        let k_denom = 1.0 + dot_product(&k, &phi);
+        for i in 0..num_features {
+            k[i] /= k_denom;
+        }
+
+        let q_hat = dot_product(&theta, &phi);
+        for i in 0..num_features {
+            theta[i] += (q - q_hat) * k[i];
+        }
+
+        let mut temp = vec![0.0; num_features];
+        for i in 0..num_features {
+            let mut sum = 0.0;
+            for j in 0..num_features {
+                sum += p[j][i] * k[j];
+            }
+            temp[i] = sum;
+        }
+
+        for i in 0..num_features {
+            for j in 0..num_features {
+                p[i][j] -= temp[i] * phi[j];
+            }
+        }
+    }
+
+    theta
+}
+
+fn dot_product(a: &[f64], b: &[f64]) -> f64 {
+    let mut result = 0.0;
+    for i in 0..a.len() {
+        result += a[i] * b[i];
+    }
+    result
+}
