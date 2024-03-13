@@ -148,3 +148,49 @@ func fixedPointKalmanFilter(samples []sample) (theta, p mat.Dense) {
     }
     return theta, p
 }
+
+
+
+
+// Residual SGD
+func residualSgd(iterations int, learningRate float64, initialQ func(S, A) float64, transitionFunction func(S, A) []S, rewardFunction func(S, A, S) float64, discountFactor float64) func(S, A) float64 {
+    bellmanOperator := func(q func(S, A) float64, s S, a A) float64 {
+        nextStates := transitionFunction(s, a)
+        var nextStateValues float64
+        for _, sNext := range nextStates {
+            maxQSa := math.Inf(-1)
+            for _, aNext := range nextActions {
+                maxQSa = math.Max(maxQSa, q(sNext, aNext))
+            }
+            nextStateValues += rewardFunction(s, a, sNext) + discountFactor*maxQSa
+        }
+        return nextStateValues / float64(len(nextStates))
+    }
+
+    costFunction := func(q func(S, A) float64) float64 {
+        var totalCost float64
+        for _, pair := range stateActionPairs {
+            s, a := pair.s, pair.a
+            qSa := q(s, a)
+            tQSa := bellmanOperator(q, s, a)
+            totalCost += math.Pow(qSa-tQSa, 2)
+        }
+        return totalCost
+    }
+
+    residualSgdUpdate := func(q func(S, A) float64, s S, a A) float64 {
+        qSa := q(s, a)
+        tQSa := bellmanOperator(q, s, a)
+        gradient := 2.0 * (qSa - tQSa)
+        return qSa - learningRate*gradient
+    }
+
+    q := initialQ
+    for iter := 0; iter < iterations; iter++ {
+        stateActionPair := randomStateActionPair()
+        s, a := stateActionPair.s, stateActionPair.a
+        q = residualSgdUpdate(q, s, a)
+    }
+
+    return q
+}
