@@ -262,3 +262,62 @@ fn dot_product(a: &[f64], b: &[f64]) -> f64 {
     }
     result
 }
+
+
+
+
+// Residual SGD
+fn residual_sgd<F, G, H>(
+    iterations: usize,
+    learning_rate: f64,
+    initial_q: F,
+    transition_function: G,
+    reward_function: H,
+    discount_factor: f64,
+) -> F
+where
+    F: FnMut(S, A) -> f64,
+    G: Fn(S, A) -> Vec<S>,
+    H: Fn(S, A, S) -> f64,
+{
+    let mut bellman_operator = |q: &mut F, s: S, a: A| {
+        let next_states = transition_function(s, a);
+        let next_state_values: f64 = next_states
+            .iter()
+            .map(|s_next| {
+                let max_q_sa = next_actions.iter().fold(f64::NEG_INFINITY, |acc, &a_next| {
+                    acc.max(q(*s_next, a_next))
+                });
+                reward_function(s, a, *s_next) + discount_factor * max_q_sa
+            })
+            .sum();
+        next_state_values / next_states.len() as f64
+    };
+
+    let cost_function = |q: &F| {
+        state_action_pairs
+            .iter()
+            .map(|&(s, a)| {
+                let q_sa = q(s, a);
+                let t_q_sa = bellman_operator(&mut q.clone(), s, a);
+                (q_sa - t_q_sa).powi(2)
+            })
+            .sum()
+    };
+
+    let mut residual_sgd_update = |q: &mut F, s: S, a: A| {
+        let q_sa = q(s, a);
+        let t_q_sa = bellman_operator(&mut q.clone(), s, a);
+        let gradient = 2.0 * (q_sa - t_q_sa);
+        q_sa - learning_rate * gradient
+    };
+
+    let mut q = initial_q;
+    for _ in 0..iterations {
+        let state_action_pair = random_state_action_pair();
+        let (s, a) = state_action_pair;
+        q = residual_sgd_update(&mut q, s, a);
+    }
+
+    q
+}
