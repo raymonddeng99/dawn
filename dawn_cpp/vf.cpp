@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <numeric>
 #include <functional>
-
+#include <cmath>
 
 // TD with Function Approximation
 
@@ -173,4 +173,52 @@ std::vector<double> fixed_point_kalman_filter(const std::vector<std::tuple<int, 
     }
 
     return theta;
+}
+
+
+
+
+// Residual SGD
+auto residualSgd(int iterations, double learningRate, std::function<double(S, A)> initialQ, std::function<std::vector<S>(S, A)> transitionFunction, std::function<double(S, A, S)> rewardFunction, double discountFactor) -> std::function<double(S, A)> {
+    auto bellmanOperator = [&](std::function<double(S, A)> q, S s, A a) -> double {
+        auto nextStates = transitionFunction(s, a);
+        double nextStateValues = 0.0;
+        for (auto sNext : nextStates) {
+            double maxQSa = std::numeric_limits<double>::lowest();
+            for (auto aNext : nextActions) {
+                maxQSa = std::max(maxQSa, q(sNext, aNext));
+            }
+            nextStateValues += rewardFunction(s, a, sNext) + discountFactor * maxQSa;
+        }
+        return nextStateValues / static_cast<double>(nextStates.size());
+    };
+
+    auto costFunction = [&](std::function<double(S, A)> q) -> double {
+        double totalCost = 0.0;
+        for (auto& pair : stateActionPairs) {
+            S s = pair.first;
+            A a = pair.second;
+            double qSa = q(s, a);
+            double tQSa = bellmanOperator(q, s, a);
+            totalCost += std::pow(qSa - tQSa, 2);
+        }
+        return totalCost;
+    };
+
+    auto residualSgdUpdate = [&](std::function<double(S, A)> q, S s, A a) -> double {
+        double qSa = q(s, a);
+        double tQSa = bellmanOperator(q, s, a);
+        double gradient = 2.0 * (qSa - tQSa);
+        return qSa - learningRate * gradient;
+    };
+
+    std::function<double(S, A)> q = initialQ;
+    for (int iter = 0; iter < iterations; ++iter) {
+        auto stateActionPair = randomStateActionPair();
+        S s = stateActionPair.first;
+        A a = stateActionPair.second;
+        q = residualSgdUpdate(q, s, a);
+    }
+
+    return q;
 }
