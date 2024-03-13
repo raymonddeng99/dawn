@@ -123,3 +123,30 @@ fixedPointKalmanFilter samples theta0 p0 =
       in (theta', p')
 
 featureVector :: State -> Action -> Vector
+
+
+
+-- Residual SGD
+residualSgd :: Int -> Double -> (S -> A -> Double) -> (S -> A -> [S]) -> (S -> A -> S -> Double) -> Double -> (S -> A -> Double)
+residualSgd iterations learningRate initialQ transitionFunction rewardFunction discountFactor = sgdLoop initialQ 0
+  where
+    bellmanOperator q s a =
+      let nextStates = transitionFunction s a
+          nextStateValues =
+            sum [rewardFunction s a s' + discountFactor * maximum [q s' a' | a' <- nextActions] | s' <- nextStates]
+       in nextStateValues / fromIntegral (length nextStates)
+
+    costFunction q = sum [(q_sa - bellmanOperator q s a) ** 2 | (s, a) <- stateActionPairs]
+
+    residualSgdUpdate q s a =
+      let q_sa = initialQ s a
+          t_q_sa = bellmanOperator q s a
+          gradient = 2.0 * (q_sa - t_q_sa)
+       in q_sa - learningRate * gradient
+
+    sgdLoop q iter
+      | iter == iterations = q
+      | otherwise =
+        let (s, a) = randomStateActionPair ()
+            q' = residualSgdUpdate q s a
+         in sgdLoop q' (iter + 1)
