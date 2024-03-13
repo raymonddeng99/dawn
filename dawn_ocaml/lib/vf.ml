@@ -93,3 +93,44 @@ let fixed_point_kalman_filter samples =
       fpkf theta' p' (i + 1) rest
   in
   fpkf zero_vector identity_matrix 0 samples
+
+
+
+
+(* Residual SGD *)
+let residual_sgd iterations learning_rate initial_q transition_function reward_function discount_factor =
+  let bellman_operator q s a =
+    let next_states = transition_function s a in
+    let next_state_values = List.map (fun s' ->
+      let max_q_sa' = List.fold_left (fun acc a' ->
+        max acc (q s' a')
+      ) neg_infinity next_actions in
+      reward_function s a s' +. discount_factor *. max_q_sa'
+    ) next_states in
+    List.fold_left (+.) 0.0 next_state_values /. float_of_int (List.length next_states)
+  in
+
+  let cost_function q =
+    List.fold_left (fun acc (s, a) ->
+      let q_sa = q s a
+      and t_q_sa = bellman_operator q s a in
+      acc +. (q_sa -. t_q_sa) ** 2.0
+    ) 0.0 state_action_pairs
+  in
+
+  let residual_sgd_update q s a =
+    let q_sa = q s a
+    and t_q_sa = bellman_operator q s a in
+    let gradient = 2.0 *. (q_sa -. t_q_sa) in
+    q s a -. learning_rate *. gradient
+  in
+
+  let rec sgd_loop q iter =
+    if iter = iterations then q
+    else
+      let state_action_pair = random_state_action_pair () in
+      let s, a = state_action_pair in
+      let q' = residual_sgd_update q s a in
+      sgd_loop q' (iter + 1)
+  in
+  sgd_loop initial_q 0
