@@ -100,3 +100,36 @@ def fixed_point_kalman_filter(samples):
 
 def feature_vector(s, a):
     return np.zeros(num_features)
+
+
+
+
+# Residual SGD
+def residual_sgd(iterations, learning_rate, initial_q, transition_function, reward_function, discount_factor):
+    def bellman_operator(q, s, a):
+        next_states = transition_function(s, a)
+        next_state_values = [
+            sum(reward_function(s, a, s_next) + discount_factor * max(q(s_next, a_next) for a_next in next_actions) for s_next in next_states)
+            for a_next in next_actions
+        ]
+        return sum(next_state_values) / len(next_states)
+
+    def cost_function(q):
+        return sum((q_sa - bellman_operator(q, s, a))**2 for s, a in state_action_pairs)
+
+    def residual_sgd_update(q, s, a):
+        q_sa = q(s, a)
+        t_q_sa = bellman_operator(q, s, a)
+        gradient = 2.0 * (q_sa - t_q_sa)
+        return q_sa - learning_rate * gradient
+
+    def sgd_loop(q, iter):
+        if iter == iterations:
+            return q
+        else:
+            state_action_pair = random_state_action_pair()
+            s, a = state_action_pair
+            q_new = residual_sgd_update(q, s, a)
+            return sgd_loop(q_new, iter + 1)
+
+    return sgd_loop(initial_q, 0)
