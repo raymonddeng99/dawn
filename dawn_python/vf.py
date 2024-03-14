@@ -133,3 +133,38 @@ def residual_sgd(iterations, learning_rate, initial_q, transition_function, rewa
             return sgd_loop(q_new, iter + 1)
 
     return sgd_loop(initial_q, 0)
+
+
+
+# Gaussian Process Temporal Difference
+def gptd(initial_mean, initial_covariance, states, actions):
+    dim = len(states[0])
+
+    def gaussian_process(mean, covariance):
+        return {"mean": mean, "covariance": covariance}
+
+    def transition_model(state, action):
+        return [], []
+
+    def reward(state, action):
+        return 0.0
+
+    def bellman_operator(gp, state, action):
+        next_states, rewards = transition_model(state, action)
+        next_values = [gp["mean"](s) for s in next_states]
+        return sum(v * r for v, r in zip(next_values, rewards))
+
+    def gptd_cost(gp):
+        total = 0.0
+        for state, action in zip(states, actions):
+            target = bellman_operator(gp, state[0], action[0])
+            value = gp["mean"](state[0])
+            error = target - value
+            total += error ** 2.0
+        return total
+
+    def optimize(gp, cost):
+        return gp
+
+    initial_gp = gaussian_process(initial_mean, initial_covariance)
+    return optimize(initial_gp, gptd_cost(initial_gp))
