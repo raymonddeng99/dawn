@@ -138,3 +138,40 @@ residualSgd iterations learningRate initialQ transitionFunction rewardFunction d
       sgdLoop q' iter
   in
     sgdLoop initialQ iterations
+
+
+
+-- Gaussian Process Temporal Difference
+data GaussianProcess : Type where
+  MkGaussianProcess : (mean : Int -> Double) -> (covariance : Int -> Int -> Double) -> GaussianProcess
+
+gptd : (initialMean : Int -> Double) -> (initialCovariance : Int -> Int -> Double) -> List (List Int) -> List (List Int) -> GaussianProcess
+gptd initialMean initialCovariance states actions =
+  let gaussianProcess : (Int -> Double) -> (Int -> Int -> Double) -> GaussianProcess
+      gaussianProcess mean covariance = MkGaussianProcess mean covariance
+
+      transitionModel : Int -> Int -> (List Int, List Double)
+      transitionModel state action = ([], [])
+
+      reward : Int -> Int -> Double
+      reward state action = 0.0
+
+      bellmanOperator : GaussianProcess -> Int -> Int -> Double
+      bellmanOperator (MkGaussianProcess mean covariance) state action =
+        let (nextStates, rewards) = transitionModel state action
+            nextValues = map mean nextStates
+        in sum (zipWith (*) nextValues rewards)
+
+      gptdCost : GaussianProcess -> Double
+      gptdCost gp =
+        let f : Double -> (List Int, List Int) -> Double
+            f cost (state, action) =
+              let target = bellmanOperator gp (head state) (head action)
+                  value = (mean gp) (head state)
+                  error = target - value
+              in cost + error ** 2.0
+        in foldl f 0.0 (zip states actions)
+
+      optimize : GaussianProcess -> Double -> GaussianProcess
+      optimize gp cost = gp
+  in optimize (gaussianProcess initialMean initialCovariance) (gptdCost (gaussianProcess initialMean initialCovariance))
