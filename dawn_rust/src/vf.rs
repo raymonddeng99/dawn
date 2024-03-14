@@ -321,3 +321,51 @@ where
 
     q
 }
+
+
+
+// Gaussian Process Temporal Difference
+struct GaussianProcess {
+    mean: Box<dyn Fn(i32) -> f64>,
+    covariance: Box<dyn Fn(i32, i32) -> f64>,
+}
+
+fn gptd(
+    initial_mean: Box<dyn Fn(i32) -> f64>,
+    initial_covariance: Box<dyn Fn(i32, i32) -> f64>,
+    states: Vec<Vec<i32>>,
+    actions: Vec<Vec<i32>>,
+) -> GaussianProcess {
+    let dim = states[0].len();
+
+    let gaussian_process = |mean: Box<dyn Fn(i32) -> f64>, covariance: Box<dyn Fn(i32, i32) -> f64>| -> GaussianProcess {
+        GaussianProcess {
+            mean,
+            covariance,
+        }
+    };
+
+    let transition_model = |state: i32, action: i32| -> (Vec<i32>, Vec<f64>) { (vec![], vec![]) };
+
+    let reward = |state: i32, action: i32| -> f64 { 0.0 };
+
+    let bellman_operator = |gp: &GaussianProcess, state: i32, action: i32| -> f64 {
+        let (next_states, rewards) = transition_model(state, action);
+        let next_values: Vec<_> = next_states.iter().map(|s| (gp.mean)(*s)).collect();
+        next_values.iter().zip(rewards.iter()).map(|(v, r)| v * r).sum()
+    };
+
+    let gptd_cost = |gp: &GaussianProcess| -> f64 {
+        states.iter().zip(actions.iter()).fold(0.0, |cost, (state, action)| {
+            let target = bellman_operator(gp, 0, 0);
+            let value = (gp.mean)(*state[0]);
+            let error = target - value;
+            cost + error.powf(2.0)
+        })
+    };
+
+    let optimize = |gp: GaussianProcess, cost: f64| -> GaussianProcess { gp };
+
+    let initial_gp = gaussian_process(initial_mean, initial_covariance);
+    optimize(initial_gp, gptd_cost(&initial_gp))
+}
