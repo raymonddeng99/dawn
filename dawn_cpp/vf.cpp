@@ -222,3 +222,53 @@ auto residualSgd(int iterations, double learningRate, std::function<double(S, A)
 
     return q;
 }
+
+
+
+
+// Gaussian Process Temporal Difference
+struct GaussianProcess {
+    std::function<double(int)> mean;
+    std::function<double(int, int)> covariance;
+};
+
+GaussianProcess gptd(std::function<double(int)> initial_mean, std::function<double(int, int)> initial_covariance, std::vector<std::vector<int>> states, std::vector<std::vector<int>> actions) {
+    int dim = states[0].size();
+
+    auto gaussian_process = [&](std::function<double(int)> mean, std::function<double(int, int)> covariance) -> GaussianProcess {
+        return {mean, covariance};
+    };
+
+    auto transition_model = [&](int state, int action) -> std::pair<std::vector<int>, std::vector<double>> { return {{}, {}}; };
+
+    auto reward = [&](int state, int action) -> double { return 0.0; };
+
+    auto bellman_operator = [&](const GaussianProcess& gp, int state, int action) -> double {
+        auto [next_states, rewards] = transition_model(state, action);
+        std::vector<double> next_values(next_states.size());
+        for (int i = 0; i < next_states.size(); ++i) {
+            next_values[i] = gp.mean(next_states[i]);
+        }
+        double total = 0.0;
+        for (int i = 0; i < next_values.size(); ++i) {
+            total += next_values[i] * rewards[i];
+        }
+        return total;
+    };
+
+    auto gptd_cost = [&](const GaussianProcess& gp) -> double {
+        double total = 0.0;
+        for (int i = 0; i < states.size(); ++i) {
+            double target = bellman_operator(gp, i, i);
+            double value = gp.mean(i);
+            double error = target - value;
+            total += std::pow(error, 2.0);
+        }
+        return total;
+    };
+
+    auto optimize = [&](const GaussianProcess& gp, double cost) -> GaussianProcess { return gp; };
+
+    GaussianProcess initial_gp = gaussian_process(initial_mean, initial_covariance);
+    return optimize(initial_gp, gptd_cost(initial_gp));
+}
