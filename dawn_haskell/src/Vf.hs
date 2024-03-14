@@ -150,3 +150,34 @@ residualSgd iterations learningRate initialQ transitionFunction rewardFunction d
         let (s, a) = randomStateActionPair ()
             q' = residualSgdUpdate q s a
          in sgdLoop q' (iter + 1)
+
+
+
+-- Gaussian Process Temporal Difference
+data GaussianProcess = GaussianProcess { mean :: Int -> Double, covariance :: Int -> Int -> Double }
+
+gptd :: (Int -> Double) -> (Int -> Int -> Double) -> [[Int]] -> [[Int]] -> GaussianProcess
+gptd initial_mean initial_covariance states actions =
+  let dim = length (head states)
+      
+      gaussianProcess mean covariance =
+        GaussianProcess { mean = \state -> mean state, covariance = \state1 state2 -> covariance state1 state2 }
+      
+      transitionModel state action = ([], Array.array (0, -1) [])
+      
+      reward state action = 0.0
+      
+      bellmanOperator gp state action =
+        let (nextStates, rewards) = transitionModel state action
+            nextValues = Array.listArray (0, -1) (map (mean gp) nextStates)
+        in sum (zipWith (*) (Array.elems nextValues) rewards)
+      
+      gptdCost gp =
+        foldl' (\cost (state, action) ->
+                  let target = bellmanOperator gp state action
+                      value = mean gp state
+                      error = target - value
+                  in cost + error ** 2.0) 0.0 (zip states actions)
+      
+      optimize gp cost = gp
+  in optimize (gaussianProcess initial_mean initial_covariance) (gptdCost (gaussianProcess initial_mean initial_covariance))
