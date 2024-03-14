@@ -134,3 +134,44 @@ let residual_sgd iterations learning_rate initial_q transition_function reward_f
       sgd_loop q' (iter + 1)
   in
   sgd_loop initial_q 0
+
+
+(* Gaussian Process Temporal Difference *)
+let gptd initial_mean initial_covariance states actions =
+  let dim = Array.length (List.hd states) in
+
+  let gaussian_process ~mean ~covariance =
+    let mean state = mean state in
+    let covariance state1 state2 = covariance state1 state2 in
+    { GP.mean; covariance }
+  in
+
+  let transition_model state action =
+    [], [||]
+  in
+  let reward state action =
+    0.0
+  in
+
+  let bellman_operator gp state action =
+    let next_states, rewards = transition_model state action in
+    let next_values = Array.map gp.GP.mean next_states in
+    Array.fold_left2 (+.) 0.0 next_values rewards
+  in
+
+  let gptd_cost gp =
+    List.fold_left (fun cost (state, action) ->
+      let target = bellman_operator gp state action in
+      let value = gp.GP.mean state in
+      let error = target -. value in
+      cost +. error ** 2.0
+    ) 0.0 (List.combine states actions)
+  in
+
+  let optimize gp cost =
+    gp
+  in
+
+  let initial_gp = gaussian_process ~mean:initial_mean ~covariance:initial_covariance in
+  let optimized_gp = optimize initial_gp gptd_cost in
+  optimized_gp
