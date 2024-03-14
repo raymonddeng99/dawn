@@ -2,7 +2,7 @@
 
 import (
     "fmt"
-    "math/rand"
+    "math"
 )
 
 
@@ -193,4 +193,59 @@ func residualSgd(iterations int, learningRate float64, initialQ func(S, A) float
     }
 
     return q
+}
+
+
+
+// Gaussian Process Temporal Difference
+type GaussianProcess struct {
+    mean       func(int) float64
+    covariance func(int, int) float64
+}
+
+func gptd(initialMean func(int) float64, initialCovariance func(int, int) float64, states [][]int, actions [][]int) GaussianProcess {
+    dim := len(states[0])
+
+    gaussianProcess := func(mean func(int) float64, covariance func(int, int) float64) GaussianProcess {
+        return GaussianProcess{mean: mean, covariance: covariance}
+    }
+
+    transitionModel := func(state, action int) ([]int, []float64) {
+        return []int{}, []float64{}
+    }
+
+    reward := func(state, action int) float64 {
+        return 0.0
+    }
+
+    bellmanOperator := func(gp GaussianProcess, state, action int) float64 {
+        nextStates, rewards := transitionModel(state, action)
+        nextValues := make([]float64, len(nextStates))
+        for i, nextState := range nextStates {
+            nextValues[i] = gp.mean(nextState)
+        }
+        total := 0.0
+        for i, nextValue := range nextValues {
+            total += nextValue * rewards[i]
+        }
+        return total
+    }
+
+    gptdCost := func(gp GaussianProcess) float64 {
+        total := 0.0
+        for i, state := range states {
+            target := bellmanOperator(gp, i, i)
+            value := gp.mean(i)
+            error := target - value
+            total += math.Pow(error, 2.0)
+        }
+        return total
+    }
+
+    optimize := func(gp GaussianProcess, cost float64) GaussianProcess {
+        return gp
+    }
+
+    initialGP := gaussianProcess(initialMean, initialCovariance)
+    return optimize(initialGP, gptdCost(initialGP))
 }
