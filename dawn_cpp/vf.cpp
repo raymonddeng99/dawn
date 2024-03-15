@@ -272,3 +272,39 @@ GaussianProcess gptd(std::function<double(int)> initial_mean, std::function<doub
     GaussianProcess initial_gp = gaussian_process(initial_mean, initial_covariance);
     return optimize(initial_gp, gptd_cost(initial_gp));
 }
+
+
+// Kalman Temporal Differences
+typedef MatrixXd Matrix;
+
+Matrix kalman_temporal_differences(double gamma, double lambda, double alpha_theta, double alpha_v, double alpha_w, Matrix rho, Matrix phi, function<Matrix(int, int)> feature_map, Matrix initial_theta, Matrix initial_v, Matrix initial_w) {
+    int dim_theta = initial_theta.rows();
+    int dim_v = initial_v.rows();
+    int dim_w = initial_w.rows();
+
+    Matrix theta = initial_theta;
+    Matrix v = initial_v;
+    Matrix w = initial_w;
+    Matrix p = rho * rho.transpose();
+
+    function<void(int, int)> loop;
+    loop = [&](int state, int action) {
+        Matrix x = feature_map(state, action);
+        int next_state = get_state();
+        double reward = get_reward();
+        int next_action = get_action(next_state);
+        Matrix x_next = feature_map(next_state, next_action);
+
+        Matrix delta = reward + gamma * (theta * x_next).sum() - (theta * x).sum();
+        Matrix phi_trans = phi.transpose();
+        Matrix k = p * (phi_trans * (phi * p * phi_trans + lambda));
+        theta += k * delta * alpha_theta;
+        v += (delta - phi * v) * alpha_v;
+        w += (x - phi * w) * alpha_w;
+        p -= k * (phi * p);
+
+        loop(next_state, next_action);
+    };
+
+    loop(get_state(), get_action(get_state()));
+}
