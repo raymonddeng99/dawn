@@ -7,7 +7,7 @@ import Data.List (maximumBy)
 import System.Random (getStdRandom, randomR)
 import Data.Vector (Vector, zip, zipWith, (!))
 import qualified Data.Vector as V
-
+import Numeric.LinearAlgebra
 
 
 -- TD with Function Approximation
@@ -181,3 +181,30 @@ gptd initial_mean initial_covariance states actions =
       
       optimize gp cost = gp
   in optimize (gaussianProcess initial_mean initial_covariance) (gptdCost (gaussianProcess initial_mean initial_covariance))
+
+
+-- Kalman Temporal Difference
+kalmanTemporalDifferences :: Double -> Double -> Double -> Double -> Double -> Matrix Double -> Matrix Double -> (Int -> Int -> Matrix Double) -> Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double -> IO ()
+kalmanTemporalDifferences gamma lambda alphaTheta alphaV alphaW rho phi featureMap initialTheta initialV initialW = do
+  let dimTheta = size (rows initialTheta)
+      dimV = size (rows initialV)
+      dimW = size (rows initialW)
+      theta = initialTheta
+      v = initialV
+      w = initialW
+      p = rho <> tr rho
+      loop state action = do
+        let x = featureMap state action
+        next_state = getState
+        reward = getReward
+        next_action = getAction next_state
+        xNext = featureMap next_state next_action
+        delta = reward + gamma * (theta #> xNext) - (theta #> x)
+        phiTrans = tr phi
+        k = p <> phiTrans <> ((phi <> p <> phiTrans) + scalar lambda)
+        theta' = theta + (k <> (scalar alphaTheta * delta))
+        v' = v + ((delta - (phi #> v)) * scalar alphaV)
+        w' = w + ((x - (phi #> w)) * scalar alphaW)
+        p' = rho <> tr rho - (k <> (phi <> p))
+        loop next_state next_action
+  loop getState (getAction (getState))
