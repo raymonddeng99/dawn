@@ -4,7 +4,7 @@
 use rand::Rng;
 use std::collections::HashMap;
 use std::ops::{Add, Mul};
-
+use nalgebra::{DMatrix, Scalar};
 
 
 // TD with Function Approximation
@@ -368,4 +368,71 @@ fn gptd(
 
     let initial_gp = gaussian_process(initial_mean, initial_covariance);
     optimize(initial_gp, gptd_cost(&initial_gp))
+}
+
+
+// Kalman Temporal Differences
+fn kalman_temporal_differences<S, F>(
+    gamma: S,
+    lambda: S,
+    alpha_theta: S,
+    alpha_v: S,
+    alpha_w: S,
+    rho: &DMatrix<S>,
+    phi: &DMatrix<S>,
+    feature_map: F,
+    initial_theta: &DMatrix<S>,
+    initial_v: &DMatrix<S>,
+    initial_w: &DMatrix<S>,
+)
+where
+    S: Scalar + Copy,
+    F: Fn(usize, usize) -> DMatrix<S>,
+{
+    let dim_theta = initial_theta.nrows();
+    let dim_v = initial_v.nrows();
+    let dim_w = initial_w.nrows();
+
+    let mut theta = initial_theta.clone();
+    let mut v = initial_v.clone();
+    let mut w = initial_w.clone();
+    let mut p = rho * rho.transpose();
+
+    fn loop_fn<S, F>(
+        state: usize,
+        action: usize,
+        theta: &mut DMatrix<S>,
+        v: &mut DMatrix<S>,
+        w: &mut DMatrix<S>,
+        p: &mut DMatrix<S>,
+        gamma: S,
+        lambda: S,
+        alpha_theta: S,
+        alpha_v: S,
+        alpha_w: S,
+        rho: &DMatrix<S>,
+        phi: &DMatrix<S>,
+        feature_map: F,
+    ) where
+        S: Scalar + Copy,
+        F: Fn(usize, usize) -> DMatrix<S>,
+    {
+        let x = feature_map(state, action);
+        let next_state = get_state();
+        let reward = get_reward();
+        let next_action = get_action(next_state);
+        let x_next = feature_map(next_state, next_action);
+
+        let delta =
+            reward + gamma * (theta * x_next).sum() - (theta * x).sum();
+        let phi_trans = phi.transpose();
+        let k = p * (phi_trans * (phi * p * phi_trans + lambda));
+        *theta += &k * delta * alpha_theta;
+        *v += &(delta - phi * v) * alpha_v;
+        *w += &(x - phi * w) * alpha_w;
+        *p -= &k * (phi * p);
+        loop_fn(next_state, next_action, theta, v, w, p, gamma, lambda, alpha_theta, alpha_v, alpha_w, rho, phi, feature_map);
+    }
+
+    loop_fn(get_state(), get_action(get_state()), &mut theta, &mut v, &mut w, &mut p, gamma, lambda, alpha_theta, alpha_v, alpha_w, rho, phi, &feature_map);
 }
