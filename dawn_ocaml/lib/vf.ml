@@ -175,3 +175,47 @@ let gptd initial_mean initial_covariance states actions =
   let initial_gp = gaussian_process ~mean:initial_mean ~covariance:initial_covariance in
   let optimized_gp = optimize initial_gp gptd_cost in
   optimized_gp
+
+
+(* Kalman Temporal Differences *)
+let kalman_temporal_differences
+    ~gamma
+    ~lambda
+    ~alpha_theta
+    ~alpha_v
+    ~alpha_w
+    ~rho
+    ~phi
+    ~feature_map
+    ~initial_theta
+    ~initial_v
+    ~initial_w =
+  
+  let dim_theta = Array.length initial_theta in
+  let dim_v = Array.length initial_v in
+  let dim_w = Array.length initial_w in
+
+  let theta = ref initial_theta in
+  let v = ref initial_v in
+  let w = ref initial_w in
+  let p = ref (Mat.mul rho (Mat.transpose rho)) in
+
+  let rec loop state action =
+    let x = feature_map state action in
+    let next_state = get_state () in
+    let reward = get_reward () in
+    let next_action = get_action next_state in
+    let x_next = feature_map next_state next_action in
+
+    let delta = reward +. gamma *. (Mat.mul !theta x_next) -. (Mat.mul !theta x) in
+    let phi_trans = Mat.transpose phi in
+    let k = Mat.mul !p (Mat.mul phi_trans (Mat.add (Mat.mul phi !p phi_trans) lambda)) in
+
+    theta := Mat.add !theta (Mat.mul (Mat.mul k delta) alpha_theta);
+    v := Mat.add !v (Mat.mul (Mat.sub delta (Mat.mul phi !v)) alpha_v);
+    w := Mat.add !w (Mat.mul (Mat.sub x (Mat.mul phi !w)) alpha_w);
+    p := Mat.sub (Mat.mul rho (Mat.transpose rho)) (Mat.mul k (Mat.mul phi !p));
+
+    loop next_state next_action
+  in
+  loop (get_state ()) (get_action (get_state ()))
