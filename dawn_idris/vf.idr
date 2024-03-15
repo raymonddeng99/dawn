@@ -1,6 +1,6 @@
 -- RL: Parametric Value Function Approximation
 import Data.Vect
-
+import Data.Matrix
 
 
 
@@ -175,3 +175,32 @@ gptd initialMean initialCovariance states actions =
       optimize : GaussianProcess -> Double -> GaussianProcess
       optimize gp cost = gp
   in optimize (gaussianProcess initialMean initialCovariance) (gptdCost (gaussianProcess initialMean initialCovariance))
+
+
+
+-- Kalman Temporal Differences
+kalmanTemporalDifferences : Double -> Double -> Double -> Double -> Double -> Matrix Double -> Matrix Double -> (Int -> Int -> Matrix Double) -> Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double -> IO ()
+kalmanTemporalDifferences gamma lambda alphaTheta alphaV alphaW rho phi featureMap initialTheta initialV initialW =
+  let
+    dimTheta = nrows initialTheta
+    dimV = nrows initialV
+    dimW = nrows initialW
+
+    loop : Int -> Int -> Matrix Double -> Matrix Double -> Matrix Double -> Matrix Double -> IO ()
+    loop state action theta v w p = do
+      let x = featureMap state action
+          next_state = getState
+          reward = getReward
+          next_action = getAction next_state
+          xNext = featureMap next_state next_action
+
+          delta = reward + gamma * (sum $ zipWith (*) (toList $ flatten $ theta * xNext) (repeat 1.0)) - (sum $ zipWith (*) (toList $ flatten $ theta * x) (repeat 1.0))
+          phiTrans = transpose phi
+          k = p * (phiTrans * (phi * p * phiTrans + scalar lambda))
+          theta' = theta + (k * delta * scalar alphaTheta)
+          v' = v + ((delta - (phi * v)) * scalar alphaV)
+          w' = w + ((x - (phi * w)) * scalar alphaW)
+          p' = rho * transpose rho - (k * (phi * p))
+      loop next_state next_action theta' v' w' p'
+  in
+    loop (get_state ()) (get_action (get_state ())) initialTheta initialV initialW (rho * transpose rho)
