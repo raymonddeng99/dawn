@@ -168,3 +168,38 @@ def gptd(initial_mean, initial_covariance, states, actions):
 
     initial_gp = gaussian_process(initial_mean, initial_covariance)
     return optimize(initial_gp, gptd_cost(initial_gp))
+
+
+# Kalman Temporal Differences
+def kalman_temporal_differences(
+    gamma, lambda_, alpha_theta, alpha_v, alpha_w, rho, phi, feature_map,
+    initial_theta, initial_v, initial_w
+):
+    dim_theta = len(initial_theta)
+    dim_v = len(initial_v)
+    dim_w = len(initial_w)
+
+    theta = initial_theta
+    v = initial_v
+    w = initial_w
+    p = rho @ rho.T
+
+    def loop(state, action):
+        x = feature_map(state, action)
+        next_state = get_state()
+        reward = get_reward()
+        next_action = get_action(next_state)
+        x_next = feature_map(next_state, next_action)
+
+        delta = reward + gamma * (theta @ x_next) - (theta @ x)
+        phi_trans = phi.T
+        k = p @ (phi_trans @ (phi @ p @ phi_trans + lambda_))
+        nonlocal theta, v, w, p
+        theta += (k @ delta) * alpha_theta
+        v += ((delta - phi @ v) * alpha_v)
+        w += ((x - phi @ w) * alpha_w)
+        p -= k @ (phi @ p)
+
+        loop(next_state, next_action)
+
+    loop(get_state(), get_action(get_state()))
