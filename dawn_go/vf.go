@@ -249,3 +249,43 @@ func gptd(initialMean func(int) float64, initialCovariance func(int, int) float6
     initialGP := gaussianProcess(initialMean, initialCovariance)
     return optimize(initialGP, gptdCost(initialGP))
 }
+
+
+// Kalman Temporal Differences
+func KalmanTemporalDifferences(
+    gamma, lambda, alphaTheta, alphaV, alphaW float64,
+    rho, phi Matrix,
+    featureMap func(int, int) Matrix,
+    initialTheta, initialV, initialW Matrix,
+) {
+    dimTheta := len(initialTheta)
+    dimV := len(initialV)
+    dimW := len(initialW)
+
+    theta := initialTheta
+    v := initialV
+    w := initialW
+    p := MatMul(rho, MatTranspose(rho))
+
+    var loop func(int, int)
+    loop = func(state, action int) {
+        x := featureMap(state, action)
+        nextState := getState()
+        reward := getReward()
+        nextAction := getAction(nextState)
+        xNext := featureMap(nextState, nextAction)
+
+        delta := reward + gamma*(MatMul(theta, xNext)[0][0]) - (MatMul(theta, x)[0][0])
+        phiTrans := MatTranspose(phi)
+        k := MatMul(p, MatMul(phiTrans, MatAdd(MatMul(phi, p), MatScalarMul(lambda, phiTrans))))
+
+        theta = MatAdd(theta, MatScalarMul(MatMul(k, delta), alphaTheta))
+        v = MatAdd(v, MatScalarMul(MatSub(delta, MatMul(phi, v)), alphaV))
+        w = MatAdd(w, MatScalarMul(MatSub(x, MatMul(phi, w)), alphaW))
+        p = MatSub(MatMul(rho, MatTranspose(rho)), MatMul(k, MatMul(phi, p)))
+
+        loop(nextState, nextAction)
+    }
+
+    loop(getState(), getAction(getState()))
+}
