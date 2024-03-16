@@ -436,3 +436,25 @@ where
 
     loop_fn(get_state(), get_action(get_state()), &mut theta, &mut v, &mut w, &mut p, gamma, lambda, alpha_theta, alpha_v, alpha_w, rho, phi, &feature_map);
 }
+
+
+// Fixed-point least-squares temporal difference
+fn lstd_fixed_point<S, F>(phi: F, gamma: f64, samples: &[(S, f64, S)]) -> DVector<f64>
+where
+    F: Fn(&S) -> DVector<f64>,
+{
+    let phi_dim = phi(&samples[0].0).nrows();
+    let mut a = DMatrix::zeros(phi_dim, phi_dim);
+    let mut b = DVector::zeros(phi_dim);
+
+    for (x, r, xp) in samples {
+        let phi_x = phi(x);
+        let phi_xp = phi(xp);
+        let phi_x_row = phi_x.map(|v| v * gamma);
+        a += phi_x.outer_product(&phi_x_row);
+        b += &phi_x * r;
+        b -= &phi_xp;
+    }
+
+    a.solve_fastest(&b).unwrap()
+}

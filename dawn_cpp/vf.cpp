@@ -308,3 +308,24 @@ Matrix kalman_temporal_differences(double gamma, double lambda, double alpha_the
 
     loop(get_state(), get_action(get_state()));
 }
+
+
+
+// Fixed-point least-squares temporal difference
+template <typename S>
+VectorXd lstd_fixed_point(std::function<VectorXd(const S&)> phi, double gamma, const std::vector<std::tuple<S, double, S>>& samples) {
+    int phi_dim = phi(std::get<0>(samples[0])).size();
+    MatrixXd a = MatrixXd::Zero(phi_dim, phi_dim);
+    VectorXd b = VectorXd::Zero(phi_dim);
+
+    for (const auto& [x, r, xp] : samples) {
+        VectorXd phi_x = phi(x);
+        VectorXd phi_xp = phi(xp);
+        VectorXd phi_x_row = gamma * phi_x;
+        a += phi_x * phi_x_row.transpose();
+        b += phi_x * r;
+        b -= phi_xp;
+    }
+
+    return a.ldlt().solve(b);
+}
