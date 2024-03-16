@@ -204,3 +204,17 @@ kalmanTemporalDifferences gamma lambda alphaTheta alphaV alphaW rho phi featureM
       loop next_state next_action theta' v' w' p'
   in
     loop (get_state ()) (get_action (get_state ())) initialTheta initialV initialW (rho * transpose rho)
+
+
+-- Fixed-point least-squares temporal difference
+lstdFixedPoint : (phi : s -> Vect n Double) -> (gamma : Double) -> (samples : List (s, Double, s)) -> Vect n Double
+lstdFixedPoint phi gamma samples = solve a b
+  where
+    n : Nat
+    n = length (phi (fst (head samples)))
+    a : Vect n (Vect n Double)
+    a = [[ sum [ (phi x `index` i) * gamma * (phi x `index` j) | x <- map fst samples ] | j <- [0..n-1] ] | i <- [0..n-1]]
+    b : Vect n Double
+    b = [ sum [ (phi x `index` i) * (r - sum (phi y)) | (x, r, y) <- samples ] | i <- [0..n-1]]
+
+    solve : Vect n (Vect n Double) -> Vect n Double -> Vect n Double
