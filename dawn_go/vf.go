@@ -289,3 +289,26 @@ func KalmanTemporalDifferences(
 
     loop(getState(), getAction(getState()))
 }
+
+
+// Fixed-point least-squares temporal difference
+func lstdFixedPoint(phi func(s interface{}) []float64, gamma float64, samples [][]interface{}) []float64 {
+    n := len(phi(samples[0][0]))
+    a := mat.NewDense(n, n, nil)
+    b := make([]float64, n)
+
+    for _, sample := range samples {
+        x, r, xp := sample[0], sample[1].(float64), sample[2]
+        phi_x := mat.NewVecDense(len(phi(x)), phi(x))
+        phi_xp := mat.NewVecDense(len(phi(xp)), phi(xp))
+        phi_x_row := mat.NewVecDense(n, nil)
+        phi_x_row.MulVec(phi_x, mat.NewScalar(gamma, nil))
+        a.Add(a, mat.OuterProduct(phi_x, phi_x_row))
+        b = mat.Sum(b, phi_x.ScaleVec(r, nil))
+        b = mat.SubVec(b, phi_xp)
+    }
+
+    theta := make([]float64, n)
+    mat.Solve(a, b, theta)
+    return theta
+}
