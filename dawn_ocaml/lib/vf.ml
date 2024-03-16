@@ -219,3 +219,29 @@ let kalman_temporal_differences
     loop next_state next_action
   in
   loop (get_state ()) (get_action (get_state ()))
+
+
+(* Fixed-point least-squares temporal difference *)
+let lstd_fixed_point phi gamma samples =
+  let n = List.length samples in
+  let phi_dim = List.hd samples |> fst |> Array.length in
+
+  let a = Array.make_matrix phi_dim phi_dim 0.0 in
+  let b = Array.make phi_dim 0.0 in
+  List.iter (fun (x, r, xp) ->
+    let phi_x = phi x in
+    let phi_xp = phi xp in
+    let phi_x_row = Array.map (fun v -> v *. gamma) phi_x in
+    for i = 0 to phi_dim - 1 do
+      for j = 0 to phi_dim - 1 do
+        a.(i).(j) <- a.(i).(j) +. phi_x.(i) *. phi_x_row.(j)
+      done;
+      b.(i) <- b.(i) +. phi_x.(i) *. r
+    done;
+    for i = 0 to phi_dim - 1 do
+      b.(i) <- b.(i) -. phi_xp.(i)
+    done
+  ) samples;
+
+  let theta = Lacaml.D.gels a b in
+  theta
