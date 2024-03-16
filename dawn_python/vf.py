@@ -203,3 +203,22 @@ def kalman_temporal_differences(
         loop(next_state, next_action)
 
     loop(get_state(), get_action(get_state()))
+
+
+
+# Fixed-point least-squares temporal difference
+def lstd_fixed_point(phi, gamma, samples):
+    phi_dim = len(phi(samples[0][0]))
+    a = np.zeros((phi_dim, phi_dim))
+    b = np.zeros(phi_dim)
+
+    for x, r, xp in samples:
+        phi_x = np.array(phi(x))
+        phi_xp = np.array(phi(xp))
+        phi_x_row = gamma * phi_x
+        a += np.outer(phi_x, phi_x_row)
+        b += phi_x * r
+        b -= phi_xp
+
+    theta = np.linalg.solve(a, b)
+    return theta
