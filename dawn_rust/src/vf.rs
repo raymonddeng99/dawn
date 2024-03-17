@@ -5,6 +5,7 @@ use rand::Rng;
 use std::collections::HashMap;
 use std::ops::{Add, Mul};
 use nalgebra::{DMatrix, Scalar};
+use std::f64::consts::SQRT_2;
 
 
 // TD with Function Approximation
@@ -457,4 +458,84 @@ where
     }
 
     a.solve_fastest(&b).unwrap()
+}
+
+
+// Statistically linear least-squares temporal difference
+fn sl_lstd(
+    theta_0: Vec<f64>,
+    m_0: Vec<f64>,
+    p_0: Vec<Vec<f64>>,
+    sigma_0: Vec<Vec<f64>>,
+    transitions: Vec<(f64, f64, f64, f64, f64)>,
+) -> (Vec<f64>, Vec<f64>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
+    let p = theta_0.len();
+    let dim = p;
+    let lambda = 1e-5 + 2.0 * (p as f64) / (1.0 - 2.0 * (p as f64));
+
+    let unscented_transform = |mean: &Vec<f64>, cov: &Vec<Vec<f64>>| {
+        let n = mean.len();
+        let gamma = (n as f64 + lambda).sqrt();
+        let mut sigma_points = Vec::with_capacity(2 * n + 1);
+        let mut weights = Vec::with_capacity(2 * n + 1);
+
+        sigma_points.push(mean.clone());
+        weights.push(lambda / (n as f64 + lambda));
+
+        for i in 1..=2 * n {
+            let idx = i - 1;
+            let sign = if i <= n { 1.0 } else { -1.0 };
+            let mut sigma_point = mean.clone();
+            for j in 0..n {
+                sigma_point[j] += sign * gamma * cov[j][j].sqrt();
+            }
+            sigma_points.push(sigma_point);
+            weights.push(1.0 / (2.0 * (n as f64 + lambda)));
+        }
+
+        (sigma_points, weights)
+    };
+
+    let sherman_morrison_update = |mat: &Vec<Vec<f64>>, vec: &Vec<f64>| {
+        let n = mat.len();
+        let k = 1.0 + vec.iter().zip(mat.iter().flat_map(|row| row.iter())).map(|(x, y)| x * y).sum::<f64>();
+        let mut new_mat = mat.clone();
+        for i in 0..n {
+            for j in 0..n {
+                new_mat[i][j] -= mat[i][j] * vec[i] * vec[j] / k;
+            }
+        }
+        new_mat
+    };
+
+    let mut theta = theta_0;
+    let mut m = m_0;
+    let mut p_inv = p_0;
+    let mut sigma = sigma_0;
+    let mut sigma_inv = sigma_0;
+
+    for transition in transitions {
+        let (s, a, r, s_prime, _) = transition;
+        let (sigma_points_theta, weights_theta) = unscented_transform(&theta, &p_inv);
+        let (sigma_points_sigma, weights_sigma) = unscented_transform(&theta, &sigma);
+
+        let q_sigma_points: Vec<f64> = sigma_points_theta.iter().map(|th| f(s, a, th)).collect();
+        let pq_sigma_points: Vec<f64> = sigma_points_sigma.iter().map(|si| pf(s, a, si)).collect();
+
+        let (q_bar, p_qtheta) = statistics_from(&q_sigma_points, &weights_theta);
+        let (pq_bar, p_sigma_pq) = statistics_from(&pq_sigma_points, &weights_sigma);
+
+        let a = matrix_vector_mul(&p_inv, &p_qtheta);
+        let c = matrix_vector_mul(&sigma_inv, &p_sigma_pq);
+        let k = vector_matrix_vector_mul(&m, &vector_sub(&a, &c));
+        let td_error = r + 0.99 * pq_bar - q_bar;
+
+        theta = vector_add(&theta, &vector_scale(&k, td_error));
+        m = vector_sub(&m, &vector_scale(&k, &vector_matrix_vector_mul(&m, &vector_sub(&a, &c))));
+        p_inv = sherman_morrison_update(&p_inv, &vector_sub(&a, &c));
+        sigma = sherman_morrison_update(&sigma, &p_sigma_pq);
+        sigma_inv = sherman_morrison_update(&sigma_inv, &p_sigma_pq);
+    }
+
+    (theta, m, p_inv, sigma, sigma_inv)
 }
