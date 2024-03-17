@@ -1,11 +1,11 @@
 -- RL: Parametric Value Function Approximation
 
-import Control.Monad (when)
+import Control.Monad (when, foldM)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Data.Array (Array, array, accumArray, assocs, (!))
 import Data.List (maximumBy)
 import System.Random (getStdRandom, randomR)
-import Data.Vector (Vector, zip, zipWith, (!))
+import Data.Vector (Vector, zip, zipWith, map, (!))
 import qualified Data.Vector as V
 import Numeric.LinearAlgebra
 
@@ -219,3 +219,48 @@ lstdFixedPoint phi gamma samples = solve (fromLists [zip [1..n] row | row <- tra
     n = length . head . map (phi . fst) $ samples
     a = [[(phi x !! i) * gamma * (phi x !! j) | j <- [1..n]] | x <- map fst samples, i <- [1..n]]
     b = [sum [(phi x !! i) * (r - sum (phi y)) | (x, r, y) <- samples] | i <- [1..n]]
+
+
+
+-- Statistically linear least-squares temporal difference
+slLstd theta0 m0 p0 sigma0 transitions = foldM loopStep (theta0, m0, p0, sigma0, sigma0) transitions
+  where
+    p = V.length theta0
+    dim = p
+    lambda = 1e-5 + 2.0 * (fromIntegral p) / (1.0 - (fromIntegral (2 * p)))
+    unscented_transform mean cov =
+      let n = V.length mean
+          gamma = sqrt (fromIntegral n + lambda)
+          sigma_points = V.generateM (2 * n + 1) $ \i ->
+            if i == 0
+            then return mean
+            else
+              let idx = i - 1
+                  sign = if i <= n then 1 else -1
+               in return $ V.zipWith (\x y -> x + sign * gamma * sqrt y) mean (cov `V.indexed` idx)
+          weights = V.generateM (2 * n + 1) $ \i ->
+            if i == 0
+            then return (lambda / (fromIntegral n + lambda))
+            else return (1.0 / (2.0 * (fromIntegral n + lambda)))
+       in (sigma_points, weights)
+    sherman_morrison_update mat vec =
+      let k = 1.0 + V.dot vec (mat `V.mvprod` vec)
+       in mat - (mat `V.outerProd` vec) `V.scale` (1.0 / k)
+    loopStep (theta, m, p_inv, sigma, sigma_inv) (s, a, r, s', _) =
+      let (sigma_points_theta, weights_theta) = unscented_transform theta p
+          (sigma_points_sigma, weights_sigma) = unscented_transform theta sigma
+          q_sigma_points = map (f s a) sigma_points_theta
+          pq_sigma_points = map (pf s a) sigma_points_sigma
+          (q_bar, p_qtheta) = statistics_from q_sigma_points weights_theta
+          (pq_bar, p_sigma_pq) = statistics_from pq_sigma_points weights_sigma
+          a = p_inv `V.mvprod` p_qtheta
+          c = sigma_inv `V.mvprod` p_sigma_pq
+          k = m `V.mvprod` (a - c)
+          td_error = r + gamma * pq_bar - q_bar
+          theta' = theta + k `V.scale` td_error
+          m' = m - k `V.mvprod` (m `V.mvprod` (a - c))
+          p' = sherman_morrison_update p (a - c)
+          p_inv' = sherman_morrison_update p_inv (p_qtheta - p_sigma_pq)
+          sigma' = sherman_morrison_update sigma p_sigma_pq
+          sigma_inv' = sherman_morrison_update sigma_inv p_sigma_pq
+       in (theta', m', p_inv', sigma', sigma_inv')
