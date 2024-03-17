@@ -222,3 +222,63 @@ def lstd_fixed_point(phi, gamma, samples):
 
     theta = np.linalg.solve(a, b)
     return theta
+
+
+# Statistically linear least-squares temporal difference
+def sl_lstd(theta_0, m_0, p_0, sigma_0, transitions):
+    p = len(theta_0)
+    dim = p
+    lambda_ = 1e-5 + 2.0 * p / (1.0 - 2.0 * p)
+
+    def unscented_transform(mean, cov):
+        n = len(mean)
+        gamma = math.sqrt(n + lambda_)
+        sigma_points = np.zeros((2 * n + 1, n))
+        weights = np.zeros(2 * n + 1)
+
+        sigma_points[0] = mean
+        weights[0] = lambda_ / (n + lambda_)
+
+        for i in range(1, 2 * n + 1):
+            idx = i - 1
+            sign = 1.0 if i <= n else -1.0
+            sigma_points[i] = mean + sign * gamma * np.sqrt(np.diag(cov))
+            weights[i] = 1.0 / (2.0 * (n + lambda_))
+
+        return sigma_points, weights
+
+    def sherman_morrison_update(mat, vec):
+        n = len(mat)
+        k = 1.0 + np.dot(vec, np.dot(mat, vec))
+        new_mat = mat - np.outer(np.dot(mat, vec), vec) / k
+        return new_mat
+
+    theta = theta_0
+    m = m_0
+    p_inv = p_0
+    sigma = sigma_0
+    sigma_inv = sigma_0
+
+    for transition in transitions:
+        s, a, r, s_prime, _ = transition
+        sigma_points_theta, weights_theta = unscented_transform(theta, p_inv)
+        sigma_points_sigma, weights_sigma = unscented_transform(theta, sigma)
+
+        q_sigma_points = [f(s, a, th) for th in sigma_points_theta]
+        pq_sigma_points = [pf(s, a, si) for si in sigma_points_sigma]
+
+        q_bar, p_qtheta = statistics_from(q_sigma_points, weights_theta)
+        pq_bar, p_sigma_pq = statistics_from(pq_sigma_points, weights_sigma)
+
+        a = np.dot(p_inv, p_qtheta)
+        c = np.dot(sigma_inv, p_sigma_pq)
+        k = np.dot(m, a - c)
+        td_error = r + 0.99 * pq_bar - q_bar
+
+        theta = theta + td_error * k
+        m = m - k * np.dot(m, a - c)
+        p_inv = sherman_morrison_update(p_inv, a - c)
+        sigma = sherman_morrison_update(sigma, p_sigma_pq)
+        sigma_inv = sherman_morrison_update(sigma_inv, p_sigma_pq)
+
+    return theta, m, p_inv, sigma, sigma_inv
