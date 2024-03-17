@@ -218,3 +218,74 @@ lstdFixedPoint phi gamma samples = solve a b
     b = [ sum [ (phi x `index` i) * (r - sum (phi y)) | (x, r, y) <- samples ] | i <- [0..n-1]]
 
     solve : Vect n (Vect n Double) -> Vect n Double -> Vect n Double
+
+
+
+-- Statistically linear least-squares temporal difference
+import Data.Vect
+
+slLstd : Vect n Double -> Vect n Double -> Vect n (Vect n Double) -> Vect n (Vect n Double) -> List (Double, Double, Double, Double, Double) -> (Vect n Double, Vect n Double, Vect n (Vect n Double), Vect n (Vect n Double), Vect n (Vect n Double))
+slLstd theta0 m0 p0 sigma0 transitions = loop theta0 m0 p0 sigma0 sigma0 transitions
+  where
+    p : Nat
+    p = length theta0
+
+    dim : Nat
+    dim = p
+
+    lambda : Double
+    lambda = 1e-5 + 2.0 * cast p / (1.0 - cast (2 * p))
+
+    unscented_transform : Vect n Double -> Vect n (Vect n Double) -> (Vect (2 * n + 1) (Vect n Double), Vect (2 * n + 1) Double)
+    unscented_transform mean cov = let n = length mean
+                                       gamma = sqrt (cast n + lambda)
+                                       sigma_points = index 0 mean :: [index (idx + 1) (zipWith (+) mean (map ((*) (gamma * sqrt)) (diag cov))) | idx <- [0..2 * n - 1]]
+                                       weights = replicate (S (S (S O))) 0.0 [lambda / (cast n + lambda), replicate n (1.0 / (2.0 * (cast n + lambda)))]
+                                   in (sigma_points, weights)
+      where
+        diag : Vect n (Vect n Double) -> Vect n Double
+        diag [] = []
+        diag ((x :: xs) :: xss) = x :: diag xss
+
+    sherman_morrison_update : Vect n (Vect n Double) -> Vect n Double -> Vect n (Vect n Double)
+    sherman_morrison_update mat vec = let k = 1.0 + (vec `dot` (mat `vmvprod` vec))
+                                       in map (\row => map (\x => x - (x * (vec `dot` row) / k)) row) mat
+
+    loop : Vect n Double -> Vect n Double -> Vect n (Vect n Double) -> Vect n (Vect n Double) -> Vect n (Vect n Double) -> List (Double, Double, Double, Double, Double) -> (Vect n Double, Vect n Double, Vect n (Vect n Double), Vect n (Vect n Double), Vect n (Vect n Double))
+    loop theta m p_inv sigma sigma_inv [] = (theta, m, p_inv, sigma, sigma_inv)
+    loop theta m p_inv sigma sigma_inv ((s, a, r, s_prime, _) :: rest) = let (sigma_points_theta, weights_theta) = unscented_transform theta p_inv
+                                                                              (sigma_points_sigma, weights_sigma) = unscented_transform theta sigma
+                                                                              q_sigma_points = map (f s a) sigma_points_theta
+                                                                              pq_sigma_points = map (pf s a) sigma_points_sigma
+                                                                              (q_bar, p_qtheta) = statistics_from q_sigma_points weights_theta
+                                                                              (pq_bar, p_sigma_pq) = statistics_from pq_sigma_points weights_sigma
+                                                                              a = p_inv `vmvprod` p_qtheta
+                                                                              c = sigma_inv `vmvprod` p_sigma_pq
+                                                                              k = m `vmvprod` (minus a c)
+                                                                              td_error = r + 0.99 * pq_bar - q_bar
+                                                                              theta_prime = zipWith (+) theta (map (* td_error) k)
+                                                                              m_prime = minus m (map (* (m `vmvprod` (minus a c))) k)
+                                                                              p_inv_prime = sherman_morrison_update p_inv (minus a c)
+                                                                              sigma_prime = sherman_morrison_update sigma p_sigma_pq
+                                                                              sigma_inv_prime = sherman_morrison_update sigma_inv p_sigma_pq
+                                                                           in loop theta_prime m_prime p_inv_prime sigma_prime sigma_inv_prime rest
+
+    f : Double -> Double -> Vect n Double -> Double
+    f _ _ _ = 0.0
+
+    pf : Double -> Double -> Vect n Double -> Vect n Double
+    pf _ _ _ = replicate _ 0.0
+
+    statistics_from : Vect (2 * n + 1) Double -> Vect (2 * n + 1) Double -> (Double, Vect n Double)
+    statistics_from _ _ = (0.0, replicate _ 0.0)
+
+    vmvprod : Vect n (Vect m Double) -> Vect m Double -> Vect n Double
+    vmvprod [] [] = ?vmvprod_rhs
+    vmvprod (row :: rows) vec = let res = row `dot` vec
+                                 in res :: vmvprod rows vec
+
+    dot : Vect n Double -> Vect n Double -> Double
+    dot xs ys = sum (zipWith (*) xs ys)
+
+    minus : Vect n Double -> Vect n Double -> Vect n Double
+    minus xs ys = zipWith (-) xs ys
