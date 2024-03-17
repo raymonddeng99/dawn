@@ -245,3 +245,45 @@ let lstd_fixed_point phi gamma samples =
 
   let theta = Lacaml.D.gels a b in
   theta
+
+
+(* Statistically linear least-squares temporal difference *)
+let sl_lstd theta_0 m_0 p_0 sigma_0 transitions =
+  let p, dim = Array.length theta_0, Array.length theta_0 in
+  let lambda = 1e-5 +. 2.0 *. float p /. (1.0 -. float (2 * p)) in
+
+  let unscented_transform mean cov =
+    let n = Array.length mean in
+    let sigma_points = Array.make (2 * n + 1) [||] in
+    let weights = Array.make (2 * n + 1) 0.0 in
+    sigma_points, weights in
+
+  let sherman_morrison_update mat vec =
+    let k = 1.0 +. (vec **@ mat *@ vec) in
+    mat -@ (mat *@ (vec *@ vec **@ mat) /@ k)
+  in
+
+  let rec loop theta m p_inv sigma sigma_inv transitions =
+    match transitions with
+    | [] -> theta, m, p_inv, sigma, sigma_inv
+    | (s, a, r, s', _)::rest ->
+       let sigma_points_theta, weights_theta = unscented_transform theta p in
+       let sigma_points_sigma, weights_sigma = unscented_transform theta sigma in
+       let q_sigma_points = Array.map (fun th -> f (s, a, th)) sigma_points_theta in
+       let pq_sigma_points = Array.map (fun si -> pf (s, a, si)) sigma_points_sigma in
+       let q_bar, p_qtheta = statistics_from q_sigma_points weights_theta in
+       let pq_bar, p_sigma_pq = statistics_from pq_sigma_points weights_sigma in
+       let a = p_inv *@ p_qtheta in
+       let c = sigma_inv *@ p_sigma_pq in
+       let k = m *@ (a -@ c) **@ a in
+       let td_error = r +. gamma *. pq_bar -. q_bar in
+       let theta' = theta +@ k *@ td_error in
+       let m' = m -@ k *@ (m **@ (a -@ c)) in
+       let p' = sherman_morrison_update p (a -@ c) in
+       let p_inv' = sherman_morrison_update p_inv (p_qtheta -@ p_sigma_pq) in
+       let sigma' = sherman_morrison_update sigma p_sigma_pq in
+       let sigma_inv' = sherman_morrison_update sigma_inv p_sigma_pq in
+       loop theta' m' p_inv' sigma' sigma_inv' rest
+  in
+
+  loop theta_0 m_0 p_0 sigma_0 transitions
