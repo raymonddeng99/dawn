@@ -329,3 +329,122 @@ VectorXd lstd_fixed_point(std::function<VectorXd(const S&)> phi, double gamma, c
 
     return a.ldlt().solve(b);
 }
+
+
+
+// Statistically linear least-squares temporal difference
+vector<double> sl_lstd(
+    vector<double> theta_0,
+    vector<double> m_0,
+    vector<vector<double>> p_0,
+    vector<vector<double>> sigma_0,
+    vector<vector<double>> transitions
+) {
+    int p = theta_0.size();
+    int dim = p;
+    double lambda = 1e-5 + 2.0 * (double)p / (1.0 - 2.0 * (double)(2 * p));
+
+    auto unscented_transform = [&](vector<double> mean, vector<vector<double>> cov) {
+        int n = mean.size();
+        double gamma = sqrt(n + lambda);
+        vector<vector<double>> sigma_points(2 * n + 1, vector<double>(n));
+        vector<double> weights(2 * n + 1);
+
+        sigma_points[0] = mean;
+        weights[0] = lambda / (n + lambda);
+
+        for (int i = 1; i <= 2 * n; i++) {
+            int idx = i - 1;
+            double sign = i <= n ? 1.0 : -1.0;
+            for (int j = 0; j < n; j++) {
+                sigma_points[i][j] = mean[j] + sign * gamma * sqrt(cov[j][j]);
+            }
+            weights[i] = 1.0 / (2.0 * (n + lambda));
+        }
+
+        return make_pair(sigma_points, weights);
+    };
+
+    auto sherman_morrison_update = [&](vector<vector<double>> mat, vector<double> vec) {
+        int n = mat.size();
+        double k = 1.0;
+        for (int i = 0; i < n; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < n; j++) {
+                sum += mat[i][j] * vec[j];
+            }
+            k += vec[i] * sum;
+        }
+        vector<vector<double>> new_mat(n, vector<double>(n));
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                new_mat[i][j] = mat[i][j] - mat[i][j] * vec[i] * vec[j] / k;
+            }
+        }
+        return new_mat;
+    };
+
+    vector<double> theta = theta_0;
+    vector<double> m = m_0;
+    vector<vector<double>> p_inv = p_0;
+    vector<vector<double>> sigma = sigma_0;
+    vector<vector<double>> sigma_inv = sigma_0;
+
+    for (auto transition : transitions) {
+        double s = transition[0];
+        double a = transition[1];
+        double r = transition[2];
+        double s_prime = transition[3];
+
+        auto [sigma_points_theta, weights_theta] = unscented_transform(theta, p_inv);
+        auto [sigma_points_sigma, weights_sigma] = unscented_transform(theta, sigma);
+
+        vector<double> q_sigma_points(sigma_points_theta.size());
+        vector<double> pq_sigma_points(sigma_points_sigma.size());
+
+        for (int i = 0; i < sigma_points_theta.size(); i++) {
+            q_sigma_points[i] = f(s, a, sigma_points_theta[i]);
+        }
+        for (int i = 0; i < sigma_points_sigma.size(); i++) {
+            pq_sigma_points[i] = pf(s, a, sigma_points_sigma[i]);
+        }
+
+        auto [q_bar, p_qtheta] = statistics_from(q_sigma_points, weights_theta);
+        auto [pq_bar, p_sigma_pq] = statistics_from(pq_sigma_points, weights_sigma);
+
+        vector<double> a_vec(p);
+        vector<double> c_vec(p);
+        for (int i = 0; i < p; i++) {
+            double sum_a = 0.0;
+            double sum_c = 0.0;
+            for (int j = 0; j < p; j++) {
+                sum_a += p_inv[i][j] * p_qtheta[j];
+                sum_c += sigma_inv[i][j] * p_sigma_pq[j];
+            }
+            a_vec[i] = sum_a;
+            c_vec[i] = sum_c;
+        }
+
+        vector<double> k(p);
+        for (int i = 0; i < p; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < p; j++) {
+                sum += m[j] * (a_vec[j] - c_vec[j]);
+            }
+            k[i] = sum;
+        }
+
+        double td_error = r + 0.99 * pq_bar - q_bar;
+
+        for (int i = 0; i < p; i++) {
+            theta[i] += k[i] * td_error;
+            m[i] -= k[i] * (m[i] * (a_vec[i] - c_vec[i]));
+        }
+
+        p_inv = sherman_morrison_update(p_inv, vector<double>(p, 1.0));
+        sigma = sherman_morrison_update(sigma, p_sigma_pq);
+        sigma_inv = sherman_morrison_update(sigma_inv, p_sigma_pq);
+    }
+
+    return {theta, m, p_inv, sigma, sigma_inv};
+}
