@@ -312,3 +312,92 @@ func lstdFixedPoint(phi func(s interface{}) []float64, gamma float64, samples []
     mat.Solve(a, b, theta)
     return theta
 }
+
+
+// Statistically linear least-squares temporal difference
+func slLstd(theta0, m0, p0, sigma0 []float64, transitions [][]float64) ([]float64, []float64, []float64, []float64, []float64) {
+    p := len(theta0)
+    dim := p
+    lambda := 1e-5 + 2.0*float64(p)/(1.0-float64(2*p))
+
+    unscented_transform := func(mean, cov []float64) ([][]float64, []float64) {
+        n := len(mean)
+        gamma := math.Sqrt(float64(n) + lambda)
+        sigma_points := make([][]float64, 2*n+1)
+        weights := make([]float64, 2*n+1)
+
+        sigma_points[0] = mean
+        weights[0] = lambda / (float64(n) + lambda)
+
+        for i := 1; i <= 2*n; i++ {
+            idx := i - 1
+            sign := 1.0
+            if i > n {
+                sign = -1.0
+            }
+            sigma_point := make([]float64, n)
+            for j := 0; j < n; j++ {
+                sigma_point[j] = mean[j] + sign*gamma*math.Sqrt(cov[j])
+            }
+            sigma_points[i] = sigma_point
+            weights[i] = 1.0 / (2.0 * (float64(n) + lambda))
+        }
+
+        return sigma_points, weights
+    }
+
+    sherman_morrison_update := func(mat, vec []float64) []float64 {
+        n := len(mat)
+        k := 1.0 + dotProduct(vec, matVecProd(mat, vec))
+        new_mat := make([]float64, n*n)
+        for i := 0; i < n*n; i++ {
+            new_mat[i] = mat[i]
+        }
+        for i := 0; i < n; i++ {
+            for j := 0; j < n; j++ {
+                new_mat[i*n+j] -= mat[i*n+j] * vec[i] * vec[j] / k
+            }
+        }
+        return new_mat
+    }
+
+    loop := func(theta, m, p_inv, sigma, sigma_inv []float64, transitions [][]float64) ([]float64, []float64, []float64, []float64, []float64) {
+        if len(transitions) == 0 {
+            return theta, m, p_inv, sigma, sigma_inv
+        }
+
+        transition := transitions[0]
+        s, a, r, s_prime, _ := transition[0], transition[1], transition[2], transition[3], transition[4]
+        sigma_points_theta, weights_theta := unscented_transform(theta, p)
+        sigma_points_sigma, weights_sigma := unscented_transform(theta, sigma)
+
+        q_sigma_points := make([]float64, len(sigma_points_theta))
+        pq_sigma_points := make([]float64, len(sigma_points_sigma))
+
+        for i, th := range sigma_points_theta {
+            q_sigma_points[i] = f(s, a, th)
+        }
+        for i, si := range sigma_points_sigma {
+            pq_sigma_points[i] = pf(s, a, si)
+        }
+
+        q_bar, p_qtheta := statistics_from(q_sigma_points, weights_theta)
+        pq_bar, p_sigma_pq := statistics_from(pq_sigma_points, weights_sigma)
+
+        a := matVecProd(p_inv, p_qtheta)
+        c := matVecProd(sigma_inv, p_sigma_pq)
+        k := vecMatVecProd(m, vecSub(a, c))
+        td_error := r + gamma*pq_bar - q_bar
+
+        theta_prime := vecAdd(theta, vecScale(k, td_error))
+        m_prime := vecSub(m, vecScale(k, vecMatVecProd(m, vecSub(a, c))))
+        p_prime := sherman_morrison_update(p, vecSub(a, c))
+        p_inv_prime := sherman_morrison_update(p_inv, vecSub(p_qtheta, p_sigma_pq))
+        sigma_prime := sherman_morrison_update(sigma, p_sigma_pq)
+        sigma_inv_prime := sherman_morrison_update(sigma_inv, p_sigma_pq)
+
+        return loop(theta_prime, m_prime, p_inv_prime, sigma_prime, sigma_inv_prime, transitions[1:])
+    }
+
+    return loop(theta0, m0, p0, sigma0, sigma0, transitions)
+}
