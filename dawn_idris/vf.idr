@@ -289,3 +289,20 @@ slLstd theta0 m0 p0 sigma0 transitions = loop theta0 m0 p0 sigma0 sigma0 transit
 
     minus : Vect n Double -> Vect n Double -> Vect n Double
     minus xs ys = zipWith (-) xs ys
+
+
+
+-- Gaussian Temporal Difference, Sutton 2009
+gtd2 : Double -> Double -> Double -> Vect n (Vect p Double) -> Vect n Double -> (Vect p Double, Vect p Double)
+gtd2 alpha eta gamma features rewards =
+    let p = length $ head features
+        theta = replicate p 0.0
+        w = replicate p 0.0
+        updateTheta theta w i = zipWith (\x,y => x + alpha * tdError * (y - gamma * (index (index features (i+1)) j) * index w j)) theta (index features i)
+            where tdError = index rewards i + gamma * (sum $ zipWith (*) (index features (i+1)) theta) - (sum $ zipWith (*) (index features i) theta)
+        updateW w i = zipWith (\x,y => x + eta * alpha * (tdError * y - x * (sum $ zipWith (*) (index features i) (index features i)))) w (index features i)
+            where tdError = index rewards i + gamma * (sum $ zipWith (*) (index features (i+1)) theta) - (sum $ zipWith (*) (index features i) theta)
+        aux theta w i
+            | i == length rewards - 1 = (theta, w)
+            | otherwise = aux (updateTheta theta w i) (updateW w i) (i+1)
+    in aux theta w 0
