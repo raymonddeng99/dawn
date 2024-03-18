@@ -401,3 +401,29 @@ func slLstd(theta0, m0, p0, sigma0 []float64, transitions [][]float64) ([]float6
 
     return loop(theta0, m0, p0, sigma0, sigma0, transitions)
 }
+
+
+
+// Gaussian Temporal Difference, Sutton 2009
+func gtd2(alpha, eta, gamma float64, features [][]float64, rewards []float64) ([]float64, []float64) {
+    p := len(features[0])
+    theta := make([]float64, p)
+    w := make([]float64, p)
+
+    for i := 0; i < len(rewards)-1; i++ {
+        tdError := rewards[i]
+        for j := 0; j < p; j++ {
+            tdError += gamma * features[i+1][j] * theta[j]
+        }
+        for j := 0; j < p; j++ {
+            tdError -= features[i][j] * theta[j]
+        }
+
+        for j := 0; j < p; j++ {
+            theta[j] += alpha * tdError * (features[i][j] - gamma*features[i+1][j]*w[j])
+            w[j] += eta * alpha * (tdError*features[i][j] - w[j]*dotProduct(features[i], features[i]))
+        }
+    }
+
+    return theta, w
+}
