@@ -264,3 +264,23 @@ slLstd theta0 m0 p0 sigma0 transitions = foldM loopStep (theta0, m0, p0, sigma0,
           sigma' = sherman_morrison_update sigma p_sigma_pq
           sigma_inv' = sherman_morrison_update sigma_inv p_sigma_pq
        in (theta', m', p_inv', sigma', sigma_inv')
+
+
+
+-- Gaussian Temporal Difference 2, Sutton 2009
+import Data.Vector (Vector, fromList, toList, zipWith, (!))
+import qualified Data.Vector as V
+
+gtd2 :: Double -> Double -> Double -> [Vector Double] -> [Double] -> (Vector Double, Vector Double)
+gtd2 alpha eta gamma features rewards =
+    let p = V.length $ head features
+        theta = V.replicate p 0
+        w = V.replicate p 0
+        updateTheta theta w i = V.zipWith (\x y -> x + alpha * tdError * (y - gamma * (features !! (i+1) ! j) * w ! j)) theta (features !! i)
+            where tdError = rewards !! i + gamma * (V.sum $ V.zipWith (*) (features !! (i+1)) theta) - (V.sum $ V.zipWith (*) (features !! i) theta)
+        updateW w i = V.zipWith (\x y -> x + eta * alpha * (tdError * y - x * (V.sum $ V.zipWith (*) (features !! i) (features !! i)))) w (features !! i)
+            where tdError = rewards !! i + gamma * (V.sum $ V.zipWith (*) (features !! (i+1)) theta) - (V.sum $ V.zipWith (*) (features !! i) theta)
+        aux theta w i
+            | i == length rewards - 1 = (theta, w)
+            | otherwise = aux (updateTheta theta w i) (updateW w i) (i+1)
+    in aux theta w 0
