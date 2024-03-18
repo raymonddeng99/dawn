@@ -287,3 +287,47 @@ let sl_lstd theta_0 m_0 p_0 sigma_0 transitions =
   in
 
   loop theta_0 m_0 p_0 sigma_0 transitions
+
+
+
+(* Gaussian Temporal Difference, Sutton 2009 *)
+let gtd2 alpha eta gamma features rewards =
+  let p = Array.length features.(0) in
+  let theta = Array.make p 0.0
+  and w = Array.make p 0.0 in
+
+  let update_theta theta w i =
+    let td_error = rewards.(i) +. gamma *. (Array.fold_left (+.) 0.0
+                                            (Array.mapi
+                                               (fun j x -> x *. features.(i+1).(j))
+                                               theta))
+                   -. (Array.fold_left (+.) 0.0
+                         (Array.mapi
+                            (fun j x -> x *. features.(i).(j))
+                            theta)) in
+    Array.mapi (fun j x -> x +. alpha *. td_error *. (features.(i).(j) -. gamma *. features.(i+1).(j) *. w.(j))) theta
+  in
+
+  let update_w w i =
+    Array.mapi (fun j x -> x +. eta *. alpha *. (rewards.(i) +. gamma *. (Array.fold_left (+.) 0.0
+                                                                           (Array.mapi
+                                                                              (fun k y -> y *. features.(i+1).(k))
+                                                                              theta))
+                                                -. (Array.fold_left (+.) 0.0
+                                                     (Array.mapi
+                                                        (fun k y -> y *. features.(i).(k))
+                                                        theta))
+                                                *. features.(i).(j)
+                                                -. x *. (Array.fold_left (+.) 0.0
+                                                           (Array.mapi
+                                                              (fun k y -> y *. features.(i).(k))
+                                                              features.(i)))))
+               w
+  in
+
+  let rec aux theta w i =
+    if i = Array.length rewards - 1 then (theta, w)
+    else aux (update_theta theta w i) (update_w w i) (i + 1)
+  in
+
+  aux theta w 0
