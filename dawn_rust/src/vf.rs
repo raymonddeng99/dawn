@@ -539,3 +539,50 @@ fn sl_lstd(
 
     (theta, m, p_inv, sigma, sigma_inv)
 }
+
+
+
+// Gaussian Temporal Difference, Sutton 2009
+fn gtd2(
+    alpha: f64,
+    eta: f64,
+    gamma: f64,
+    features: &[Vec<f64>],
+    rewards: &[f64],
+) -> (Vec<f64>, Vec<f64>) {
+    let p = features[0].len();
+    let mut theta = vec![0.0; p];
+    let mut w = vec![0.0; p];
+
+    for i in 0..rewards.len() - 1 {
+        let td_error = rewards[i]
+            + gamma
+                * features[i + 1]
+                    .iter()
+                    .zip(theta.iter())
+                    .map(|(f, t)| f * t)
+                    .sum::<f64>()
+            - features[i]
+                .iter()
+                .zip(theta.iter())
+                .map(|(f, t)| f * t)
+                .sum::<f64>();
+
+        for j in 0..p {
+            theta[j] += alpha
+                * td_error
+                * (features[i][j] - gamma * features[i + 1][j] * w[j]);
+            w[j] += eta
+                * alpha
+                * (td_error * features[i][j]
+                    - w[j]
+                        * features[i]
+                            .iter()
+                            .zip(features[i].iter())
+                            .map(|(f1, f2)| f1 * f2)
+                            .sum::<f64>());
+        }
+    }
+
+    (theta, w)
+}
