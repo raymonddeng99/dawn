@@ -448,3 +448,29 @@ vector<double> sl_lstd(
 
     return {theta, m, p_inv, sigma, sigma_inv};
 }
+
+
+
+// Gaussian Temporal Difference, Sutton 2009
+std::vector<double> gtd2(double alpha, double eta, double gamma, const std::vector<std::vector<double>>& features, const std::vector<double>& rewards) {
+    int p = features[0].size();
+    std::vector<double> theta(p, 0.0), w(p, 0.0);
+
+    for (int i = 0; i < rewards.size() - 1; ++i) {
+        double td_error = rewards[i];
+        for (int j = 0; j < p; ++j) {
+            td_error += gamma * features[i+1][j] * theta[j];
+        }
+        for (int j = 0; j < p; ++j) {
+            td_error -= features[i][j] * theta[j];
+        }
+
+        for (int j = 0; j < p; ++j) {
+            theta[j] += alpha * td_error * (features[i][j] - gamma * features[i+1][j] * w[j]);
+            double dot_product = std::inner_product(features[i].begin(), features[i].end(), features[i].begin(), 0.0);
+            w[j] += eta * alpha * (td_error * features[i][j] - w[j] * dot_product);
+        }
+    }
+
+    return std::make_pair(theta, w);
+}
