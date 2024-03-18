@@ -282,3 +282,19 @@ def sl_lstd(theta_0, m_0, p_0, sigma_0, transitions):
         sigma_inv = sherman_morrison_update(sigma_inv, p_sigma_pq)
 
     return theta, m, p_inv, sigma, sigma_inv
+
+
+
+# Gaussian Temporal Difference, Sutton 2009
+def gtd2(alpha, eta, gamma, features, rewards):
+    p = len(features[0])
+    theta = np.zeros(p)
+    w = np.zeros(p)
+
+    for i in range(len(rewards) - 1):
+        td_error = rewards[i] + gamma * np.dot(features[i+1], theta) - np.dot(features[i], theta)
+
+        theta += alpha * td_error * (features[i] - gamma * features[i+1] * w)
+        w += eta * alpha * (td_error * features[i] - np.dot(w, features[i] * features[i]))
+
+    return theta, w
