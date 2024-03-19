@@ -306,3 +306,21 @@ gtd2 alpha eta gamma features rewards =
             | i == length rewards - 1 = (theta, w)
             | otherwise = aux (updateTheta theta w i) (updateW w i) (i+1)
     in aux theta w 0
+
+
+-- Temporal Difference with Correction
+tdc : Double -> Double -> Double -> (Int -> Int -> Vect n Double) -> Vect n Double -> Vect n Double -> List Int -> List Int -> List Double -> (Vect n Double, Vect n Double)
+tdc gamma alpha beta featureFunction initTheta initOmega states actions rewards =
+  aux initTheta initOmega (zip3 states (drop 1 (states ++ [head states])) (zip actions (drop 1 (actions ++ [head actions])))) (zip3 (rewards ++ [0.0]) (drop 1 (rewards ++ [0.0])) [0..length states])
+  where
+    aux : Vect n Double -> Vect n Double -> List (Int, Int, (Int, Int)) -> List (Double, Double, Nat) -> (Vect n Double, Vect n Double)
+    aux theta omega [] _ = (theta, omega)
+    aux theta omega ((s, s', (a, a')):stateActions) ((r, r', i):rewardsIdx) =
+      let phi_s = featureFunction s a
+          phi_s' = featureFunction s' a'
+          q_s = sum $ zipWith (*) theta phi_s
+          q_s' = sum $ zipWith (*) theta phi_s'
+          tdError = r + gamma * q_s' - q_s
+          thetaUpdate = zipWith (\w, f => w + alpha * tdError * f) theta phi_s
+          omegaUpdate = zipWith (\w, f => w + beta * (tdError - sum (zipWith (*) phi_s' omega) * f)) omega phi_s
+      in aux thetaUpdate omegaUpdate stateActions (drop 1 $ zip3 rewardsIdx (drop 1 rewardsIdx) [i+1..])
