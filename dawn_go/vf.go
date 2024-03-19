@@ -427,3 +427,51 @@ func gtd2(alpha, eta, gamma float64, features [][]float64, rewards []float64) ([
 
     return theta, w
 }
+
+
+// Temporal Difference with Correction
+func tdc(
+    gamma float64,
+    alpha float64,
+    beta float64,
+    featureFunction func(int, int) []float64,
+    initTheta []float64,
+    initOmega []float64,
+    states []int,
+    actions []int,
+    rewards []float64,
+) ([]float64, []float64) {
+    theta := make([]float64, len(initTheta))
+    copy(theta, initTheta)
+    omega := make([]float64, len(initOmega))
+    copy(omega, initOmega)
+
+    for i := range states {
+        s := states[i]
+        a := actions[i]
+        r := rewards[i]
+        var sNext, aNext int
+        if i == len(states)-1 {
+            sNext = s
+            aNext = a
+        } else {
+            sNext = states[i+1]
+            aNext = actions[i+1]
+        }
+
+        phiS := featureFunction(s, a)
+        phiSNext := featureFunction(sNext, aNext)
+        qS := dotProduct(theta, phiS)
+        qSNext := dotProduct(theta, phiSNext)
+        tdError := r + gamma*qSNext - qS
+
+        for j := range theta {
+            theta[j] += alpha * tdError * phiS[j]
+        }
+        for j := range omega {
+            omega[j] += beta * (tdError - dotProduct(phiSNext, omega)*phiS[j])
+        }
+    }
+
+    return theta, omega
+}
