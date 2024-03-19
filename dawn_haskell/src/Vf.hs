@@ -5,10 +5,9 @@ import Control.Monad.State (StateT, evalStateT, get, put)
 import Data.Array (Array, array, accumArray, assocs, (!))
 import Data.List (maximumBy)
 import System.Random (getStdRandom, randomR)
-import Data.Vector (Vector, zip, zipWith, map, (!))
+import Data.Vector (Vector, zip, fromList, zipWith, map, (!))
 import qualified Data.Vector as V
 import Numeric.LinearAlgebra
-
 
 -- TD with Function Approximation
 
@@ -284,3 +283,21 @@ gtd2 alpha eta gamma features rewards =
             | i == length rewards - 1 = (theta, w)
             | otherwise = aux (updateTheta theta w i) (updateW w i) (i+1)
     in aux theta w 0
+
+
+
+-- Temporal Difference with Correction
+tdc :: Double -> Double -> Double -> (Int -> Int -> Vector Double) -> Vector Double -> Vector Double -> [Int] -> [Int] -> [Double] -> (Vector Double, Vector Double)
+tdc gamma alpha beta featureFunction initTheta initOmega states actions rewards =
+  aux initTheta initOmega (zip3 states (tail states ++ [head states]) (zip actions (tail actions ++ [head actions]))) (zip3 (rewards ++ [0]) (tail rewards ++ [0]) [0..])
+  where
+    aux theta omega [] _ = (theta, omega)
+    aux theta omega ((s, s', (a, a')):stateActions) ((r, r', i):rewardsIdx) =
+      let phi_s = featureFunction s a
+          phi_s' = featureFunction s' a'
+          q_s = sum $ zipWith (*) theta phi_s
+          q_s' = sum $ zipWith (*) theta phi_s'
+          tdError = r + gamma * q_s' - q_s
+          thetaUpdate = zipWith (\w f -> w + alpha * tdError * f) theta phi_s
+          omegaUpdate = zipWith (\w f -> w + beta * (tdError - sum (zipWith (*) phi_s' omega) * f)) omega phi_s
+      in aux thetaUpdate omegaUpdate stateActions (zip3 (tail rewardsIdx) (tail $ tail rewardsIdx) [i+1..])
