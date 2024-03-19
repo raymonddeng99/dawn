@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::ops::{Add, Mul};
 use nalgebra::{DMatrix, Scalar};
 use std::f64::consts::SQRT_2;
+use std::iter::zip;
 
 
 // TD with Function Approximation
@@ -585,4 +586,66 @@ fn gtd2(
     }
 
     (theta, w)
+}
+
+// Temporal Difference with Correction  
+fn tdc<F>(
+    gamma: f64,
+    alpha: f64,
+    beta: f64,
+    feature_function: F,
+    init_theta: Vec<f64>,
+    init_omega: Vec<f64>,
+    states: Vec<usize>,
+    actions: Vec<usize>,
+    rewards: Vec<f64>,
+) -> (Vec<f64>, Vec<f64>)
+where
+    F: Fn(usize, usize) -> Vec<f64>,
+{
+    let mut theta = init_theta;
+    let mut omega = init_omega;
+
+    for ((s, s_next, a, a_next), (r, r_next, i)) in states.iter().zip(
+        states.iter().skip(1).chain(std::iter::once(&states[0])).zip(
+            actions
+                .iter()
+                .zip(actions.iter().skip(1).chain(std::iter::once(&actions[0]))),
+        ),
+    )
+    .zip(
+        rewards
+            .iter()
+            .chain(std::iter::once(&0.0))
+            .zip(rewards.iter().skip(1).chain(std::iter::once(&0.0)))
+            .zip(0..),
+    ) {
+        let phi_s = feature_function(*s, *a);
+        let phi_s_next = feature_function(*s_next, *a_next);
+        let q_s = theta.iter().zip(phi_s.iter()).map(|(w, f)| w * f).sum::<f64>();
+        let q_s_next = theta.iter().zip(phi_s_next.iter()).map(|(w, f)| w * f).sum::<f64>();
+        let td_error = *r + gamma * q_s_next - q_s;
+
+        theta = theta
+            .iter()
+            .zip(phi_s.iter())
+            .map(|(w, f)| w + alpha * td_error * f)
+            .collect();
+        omega = omega
+            .iter()
+            .zip(phi_s.iter())
+            .map(|(w, f)| {
+                w + beta
+                    * (td_error
+                        - phi_s_next
+                            .iter()
+                            .zip(omega.iter())
+                            .map(|(f2, f1)| f2 * f1)
+                            .sum::<f64>()
+                            * f)
+            })
+            .collect();
+    }
+
+    (theta, omega)
 }
