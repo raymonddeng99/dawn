@@ -298,3 +298,26 @@ def gtd2(alpha, eta, gamma, features, rewards):
         w += eta * alpha * (td_error * features[i] - np.dot(w, features[i] * features[i]))
 
     return theta, w
+
+
+# Temporal Difference with Correction
+def tdc(gamma, alpha, beta, feature_function, init_theta, init_omega, states, actions, rewards):
+    theta = np.array(init_theta)
+    omega = np.array(init_omega)
+
+    for i, (s, a, r) in enumerate(zip(states, actions, rewards)):
+        if i == len(states) - 1:
+            s_next, a_next = s, a
+        else:
+            s_next, a_next = states[i+1], actions[i+1]
+
+        phi_s = np.array(feature_function(s, a))
+        phi_s_next = np.array(feature_function(s_next, a_next))
+        q_s = np.dot(theta, phi_s)
+        q_s_next = np.dot(theta, phi_s_next)
+        td_error = r + gamma * q_s_next - q_s
+
+        theta += alpha * td_error * phi_s
+        omega += beta * (td_error - np.dot(phi_s_next, omega)) * phi_s
+
+    return theta, omega
