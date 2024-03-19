@@ -331,3 +331,33 @@ let gtd2 alpha eta gamma features rewards =
   in
 
   aux theta w 0
+
+
+(* Temporal Difference with Correction *)
+let tdc gamma alpha beta feature_function init_theta init_omega =
+  let dim_theta = Array.length init_theta in
+  let dim_omega = Array.length init_omega in
+
+  let rec aux theta omega states actions rewards i =
+    if i >= Array.length states then (theta, omega)
+    else
+      let current_state = states.(i) in
+      let current_action = actions.(i) in
+      let current_reward = rewards.(i) in
+      let next_state = if i + 1 < Array.length states then states.(i+1) else current_state in
+      let next_action = if i + 1 < Array.length actions then actions.(i+1) else current_action in
+
+      let phi_current = feature_function current_state current_action in
+      let phi_next = feature_function next_state next_action in
+      let q_current = Array.fold_left2 (fun acc w f -> acc +. f *. w) 0.0 theta phi_current in
+      let q_next = Array.fold_left2 (fun acc w f -> acc +. f *. w) 0.0 theta phi_next in
+
+      let td_error = current_reward +. gamma *. q_next -. q_current in
+
+      let theta_update = Array.map2 (fun w f -> w +. alpha *. td_error *. f) theta phi_current in
+      let omega_update = Array.map2 (fun w f -> w +. beta *. (td_error -. (Array.fold_left2 (fun acc f2 f1 -> acc +. f2 *. f1) 0.0 phi_next omega) *. f)) omega phi_current in
+
+      aux theta_update omega_update states actions rewards (i+1)
+  in
+
+  aux init_theta init_omega
