@@ -474,3 +474,44 @@ std::vector<double> gtd2(double alpha, double eta, double gamma, const std::vect
 
     return std::make_pair(theta, w);
 }
+
+// Temporal Difference With Correction
+template <typename FeatureFunction>
+std::pair<std::vector<double>, std::vector<double>> tdc(
+    double gamma,
+    double alpha,
+    double beta,
+    FeatureFunction feature_function,
+    const std::vector<double>& init_theta,
+    const std::vector<double>& init_omega,
+    const std::vector<int>& states,
+    const std::vector<int>& actions,
+    const std::vector<double>& rewards
+) {
+    std::vector<double> theta(init_theta);
+    std::vector<double> omega(init_omega);
+
+    for (size_t i = 0; i < states.size(); ++i) {
+        int s = states[i];
+        int a = actions[i];
+        double r = rewards[i];
+        int s_next = (i == states.size() - 1) ? s : states[i+1];
+        int a_next = (i == actions.size() - 1) ? a : actions[i+1];
+
+        auto phi_s = feature_function(s, a);
+        auto phi_s_next = feature_function(s_next, a_next);
+        double q_s = std::inner_product(theta.begin(), theta.end(), phi_s.begin(), 0.0);
+        double q_s_next = std::inner_product(theta.begin(), theta.end(), phi_s_next.begin(), 0.0);
+        double td_error = r + gamma * q_s_next - q_s;
+
+        for (size_t j = 0; j < theta.size(); ++j) {
+            theta[j] += alpha * td_error * phi_s[j];
+        }
+        for (size_t j = 0; j < omega.size(); ++j) {
+            double omega_update = omega[j] + beta * (td_error - std::inner_product(phi_s_next.begin(), phi_s_next.end(), omega.begin(), 0.0) * phi_s[j]);
+            omega[j] = omega_update;
+        }
+    }
+
+    return std::make_pair(theta, omega);
+}
