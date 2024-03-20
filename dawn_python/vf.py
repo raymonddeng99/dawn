@@ -321,3 +321,27 @@ def tdc(gamma, alpha, beta, feature_function, init_theta, init_omega, states, ac
         omega += beta * (td_error - np.dot(phi_s_next, omega)) * phi_s
 
     return theta, omega
+
+
+# Fitted Q
+def fitted_q(transitions, initial_q, states, actions):
+    def sampled_bellman_operator(q, transition):
+        s, a, r, s_prime = transition
+        max_q_s_prime = max(q[s_prime_val] for s_prime_val in s_prime)
+        return r + max_q_s_prime
+
+    def update_q(q, transition):
+        s, a, r, s_prime = transition
+        q[s] = sampled_bellman_operator(q, transition)
+
+    def iterate(q, transitions):
+        q_prime = q.copy()
+        for transition in transitions:
+            s, a, r, s_prime = transition
+            update_q(q_prime, transition)
+        if q == q_prime:
+            return q_prime
+        return iterate(q_prime, transitions)
+
+    q = [[initial_q(s, a) for a in actions] for s in states]
+    return iterate(q, transitions)
