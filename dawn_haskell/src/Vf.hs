@@ -301,3 +301,21 @@ tdc gamma alpha beta featureFunction initTheta initOmega states actions rewards 
           thetaUpdate = zipWith (\w f -> w + alpha * tdError * f) theta phi_s
           omegaUpdate = zipWith (\w f -> w + beta * (tdError - sum (zipWith (*) phi_s' omega) * f)) omega phi_s
       in aux thetaUpdate omegaUpdate stateActions (zip3 (tail rewardsIdx) (tail $ tail rewardsIdx) [i+1..])
+
+
+-- Fitted Q
+fittedQ transitions initialQ =
+  let sampledBellmanOperator q (s, a, r, s') =
+        r + maximum [q s'' | s'' <- s']
+      updateQ q (s, a, r, s') =
+        (s, a, sampledBellmanOperator q (s, a, r, s'))
+      iterate q trs =
+        let q' = foldr (\ (s, a, r, s') q ->
+                          map (\ (s', a', qVal) ->
+                                if s' == s
+                                then (s', a', updateQ q (s, a, r, s'))
+                                else (s', a', qVal)) q) q trs
+        in if all (\ (_, _, (qVal, qVal')) -> qVal == qVal') (zip q q')
+           then q'
+           else iterate q' trs
+  in iterate (map (\ s -> map (\ a -> initialQ s a) actions) states) transitions
