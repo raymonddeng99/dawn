@@ -324,3 +324,26 @@ tdc gamma alpha beta featureFunction initTheta initOmega states actions rewards 
           thetaUpdate = zipWith (\w, f => w + alpha * tdError * f) theta phi_s
           omegaUpdate = zipWith (\w, f => w + beta * (tdError - sum (zipWith (*) phi_s' omega) * f)) omega phi_s
       in aux thetaUpdate omegaUpdate stateActions (drop 1 $ zip3 rewardsIdx (drop 1 rewardsIdx) [i+1..])
+
+
+-- Fitted Q
+fittedQ : List (Int, Int, Double, List Int) -> (Int -> Int -> Double) -> List Int -> List Int -> List (List Double)
+fittedQ transitions initialQ states actions =
+  let sampledBellmanOperator : List Double -> (Int, Int, Double, List Int) -> Double
+      sampledBellmanOperator q (s, a, r, sPrime) =
+        r + foldl max 0.0 (map (\sPrimeVal => q !! (cast sPrimeVal)) sPrime)
+
+      updateQ : List Double -> (Int, Int, Double, List Int) -> Double
+      updateQ q (s, a, r, sPrime) = sampledBellmanOperator q (s, a, r, sPrime)
+
+      iterate : List (List Double) -> List (Int, Int, Double, List Int) -> List (List Double)
+      iterate q transitions =
+        let qPrime = map (\row => map updateQ row transitions) q
+        in if qPrime == q
+           then qPrime
+           else iterate qPrime transitions
+
+      initialQValues : List (List Double)
+      initialQValues = map (\s => map (\a => initialQ s a) actions) states
+  in
+    iterate initialQValues transitions
