@@ -7,6 +7,7 @@ use std::ops::{Add, Mul};
 use nalgebra::{DMatrix, Scalar};
 use std::f64::consts::SQRT_2;
 use std::iter::zip;
+use std::cmp::max;
 
 
 // TD with Function Approximation
@@ -648,4 +649,26 @@ where
     }
 
     (theta, omega)
+}
+
+
+// Fitted Q
+fn fitted_q<'a>(transitions: &[(usize, usize, f64, Vec<usize>)], initial_q: &'a dyn Fn(usize, usize) -> f64, states: &[usize], actions: &[usize]) -> Vec<Vec<f64>> {
+    let sampled_bellman_operator = |q: &[f64], (s, a, r, s_prime): &(usize, usize, f64, Vec<usize>)| {
+        r + s_prime.iter().map(|&s_prime| q[s_prime]).max_by(|a, b| a.partial_cmp(b).unwrap())
+    };
+    let update_q = |(s, a, r, s_prime), q: &mut Vec<f64>| {
+        q[*s] = sampled_bellman_operator(&q, (s, a, r, s_prime));
+    };
+    let mut q = vec![vec![initial_q(s, a); actions.len()]; states.len()];
+    let mut q_prime = q.clone();
+    loop {
+        for (s, a, r, s_prime) in transitions {
+            update_q((*s, *a, *r, s_prime.clone()), &mut q_prime);
+        }
+        if q.iter().zip(q_prime.iter()).all(|(q_row, q_prime_row)| q_row.iter().zip(q_prime_row.iter()).all(|(q_val, q_prime_val)| q_val == q_prime_val)) {
+            break q_prime;
+        }
+        q = q_prime.clone();
+    }
 }
