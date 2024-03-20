@@ -475,3 +475,62 @@ func tdc(
 
     return theta, omega
 }
+
+
+// Fitted Q
+func fittedQ(transitions [][]interface{}, initialQ func(int, int) float64, states, actions []int) [][]float64 {
+    sampledBellmanOperator := func(q []float64, transition []interface{}) float64 {
+        s, a, r, sPrime := transition[0].(int), transition[1].(int), transition[2].(float64), transition[3].([]int)
+        maxQSPrime := float64(0)
+        for _, sPrimeVal := range sPrime {
+            qVal := q[sPrimeVal]
+            if qVal > maxQSPrime {
+                maxQSPrime = qVal
+            }
+        }
+        return r + maxQSPrime
+    }
+    updateQ := func(q []float64, transition []interface{}) float64 {
+        s, a, r, sPrime := transition[0].(int), transition[1].(int), transition[2].(float64), transition[3].([]int)
+        return sampledBellmanOperator(q, transition)
+    }
+    iterate := func(q [][]float64, transitions [][]interface{}) [][]float64 {
+        qPrime := make([][]float64, len(q))
+        for i := range qPrime {
+            qPrime[i] = make([]float64, len(q[i]))
+            copy(qPrime[i], q[i])
+        }
+        for _, transition := range transitions {
+            s, a := transition[0].(int), transition[1].(int)
+            qPrime[s][a] = updateQ(qPrime[s], transition)
+        }
+        if equal(q, qPrime) {
+            return qPrime
+        }
+        return iterate(qPrime, transitions)
+    }
+    equal := func(q1, q2 [][]float64) bool {
+        if len(q1) != len(q2) {
+            return false
+        }
+        for i := range q1 {
+            if len(q1[i]) != len(q2[i]) {
+                return false
+            }
+            for j := range q1[i] {
+                if q1[i][j] != q2[i][j] {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+    q := make([][]float64, len(states))
+    for i := range states {
+        q[i] = make([]float64, len(actions))
+        for j := range actions {
+            q[i][j] = initialQ(states[i], actions[j])
+        }
+    }
+    return iterate(q, transitions)
+}
