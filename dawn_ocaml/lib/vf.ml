@@ -255,7 +255,6 @@ let sl_lstd theta_0 m_0 p_0 sigma_0 transitions =
   let unscented_transform mean cov =
     let n = Array.length mean in
     let sigma_points = Array.make (2 * n + 1) [||] in
-    let weights = Array.make (2 * n + 1) 0.0 in
     sigma_points, weights in
 
   let sherman_morrison_update mat vec =
@@ -361,3 +360,28 @@ let tdc gamma alpha beta feature_function init_theta init_omega =
   in
 
   aux init_theta init_omega
+
+
+(* Fitted Q *)
+let fitted_q transitions initial_q_fun =
+  let sampled_bellman_operator q (s, a, r, s_prime) =
+    r +. (max_float_array (Array.map (fun s' -> (q s')) s_prime))
+  in
+  let update_q q (s, a, r, s_prime) =
+    (s, a, sampled_bellman_operator q (s, a, r, s_prime))
+  in
+  let rec iterate q transitions =
+    let q_prime =
+      Array.fold_left
+        (fun q (s, a, r, s_prime) ->
+           Array.map (fun (s', a', q_val) ->
+             if s' = s then (s', a', update_q q (s, a, r, s_prime))
+             else (s', a', q_val))
+           q)
+        q transitions
+    in
+    if Array.for_all (fun (_, _, (q_val, q_val')) -> q_val = q_val') (Array.map2 (fun x y -> (x, y)) q q_prime)
+    then q_prime
+    else iterate q_prime transitions
+  in
+  iterate (Array.map (fun s -> Array.map (fun a -> initial_q_fun s a) actions) states) transitions
