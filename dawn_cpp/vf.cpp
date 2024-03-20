@@ -8,6 +8,7 @@
 #include <numeric>
 #include <functional>
 #include <cmath>
+#include <tuple>
 
 // TD with Function Approximation
 
@@ -514,4 +515,52 @@ std::pair<std::vector<double>, std::vector<double>> tdc(
     }
 
     return std::make_pair(theta, omega);
+}
+
+
+// Fitted Q
+std::vector<std::vector<double>> fittedQ(
+    const std::vector<std::tuple<int, int, double, std::vector<int>>>& transitions,
+    const std::function<double(int, int)>& initialQ,
+    const std::vector<int>& states,
+    const std::vector<int>& actions) {
+    auto sampledBellmanOperator = [](const std::vector<double>& q, const std::tuple<int, int, double, std::vector<int>>& transition) {
+        int s, a;
+        double r;
+        std::vector<int> sPrime;
+        std::tie(s, a, r, sPrime) = transition;
+        double maxQSPrime = 0;
+        for (int sPrimeVal : sPrime) {
+            maxQSPrime = std::max(maxQSPrime, q[sPrimeVal]);
+        }
+        return r + maxQSPrime;
+    };
+    auto updateQ = [&sampledBellmanOperator](std::vector<double>& q, const std::tuple<int, int, double, std::vector<int>>& transition) {
+        int s, a;
+        double r;
+        std::vector<int> sPrime;
+        std::tie(s, a, r, sPrime) = transition;
+        q[s] = sampledBellmanOperator(q, transition);
+    };
+    auto iterate = [&updateQ](std::vector<std::vector<double>> q, const std::vector<std::tuple<int, int, double, std::vector<int>>>& transitions) {
+        std::vector<std::vector<double>> qPrime(q.size(), std::vector<double>(q[0].size()));
+        for (const auto& transition : transitions) {
+            int s, a;
+            double r;
+            std::vector<int> sPrime;
+            std::tie(s, a, r, sPrime) = transition;
+            qPrime[s][a] = sampledBellmanOperator(qPrime[s], transition);
+        }
+        if (qPrime == q) {
+            return qPrime;
+        }
+        return iterate(qPrime, transitions);
+    };
+    std::vector<std::vector<double>> q(states.size(), std::vector<double>(actions.size()));
+    for (int i = 0; i < states.size(); ++i) {
+        for (int j = 0; j < actions.size(); ++j) {
+            q[i][j] = initialQ(states[i], actions[j]);
+        }
+    }
+    return iterate(q, transitions);
 }
