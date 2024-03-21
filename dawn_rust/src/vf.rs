@@ -8,7 +8,7 @@ use nalgebra::{DMatrix, Scalar};
 use std::f64::consts::SQRT_2;
 use std::iter::zip;
 use std::cmp::max;
-
+use ndarray::{Array1, Array2, Zip};
 
 // TD with Function Approximation
 
@@ -671,4 +671,53 @@ fn fitted_q<'a>(transitions: &[(usize, usize, f64, Vec<usize>)], initial_q: &'a 
         }
         q = q_prime.clone();
     }
+}
+
+
+// Least Squares Policy Evaluation
+fn lspe(
+    theta_init: Array1<f64>,
+    x_train: Array2<f64>,
+    y_train: Array1<f64>,
+) -> Array1<f64> {
+    let n = x_train.nrows();
+    let d = x_train.ncols();
+
+    let phi = |x: Array1<f64>| x.to_owned();
+
+    let sherman_morrison_update = |a: &Array1<f64>,
+                                    b: &Array1<f64>,
+                                    c: &Array2<f64>,
+                                    d: &Array1<f64>|
+     -> Array1<f64> {
+        let ab = b.mapv(|x| c.mapv(|y| x * y).sum());
+        let denom = 1. + ab.sum();
+        d.mapv(|x| x / denom)
+    };
+
+    let mut update = |theta: Array1<f64>| -> Array1<f64> {
+        let phi_x: Array2<_> = x_train.map_rows(phi).unwrap();
+        let phi_theta: Array1<_> = phi_x
+            .outer_iter()
+            .map(|x| x.dot(&theta))
+            .collect();
+        let errors: Array1<_> = Zip::from(&y_train)
+            .and(&phi_theta)
+            .map_collect(|&y, &y_pred| y - y_pred);
+        let a: Array1<_> = phi_x
+            .outer_iter()
+            .zip(&errors)
+            .map(|(x, &err)| x.mapv(|&xi| xi * err))
+            .collect();
+        let b = sherman_morrison_update(&theta, &a, &phi_x, &theta);
+        let new_theta = &theta + &b;
+
+        if errors.mapv(|x| x.powi(2)).sum() < 1e-6 {
+            new_theta
+        } else {
+            update(new_theta)
+        }
+    };
+
+    update(theta_init)
 }
