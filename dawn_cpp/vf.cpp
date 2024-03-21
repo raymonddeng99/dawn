@@ -564,3 +564,58 @@ std::vector<std::vector<double>> fittedQ(
     }
     return iterate(q, transitions);
 }
+
+
+
+// Least Squares Policy Evaluation
+std::vector<double> lspe(const std::vector<double>& theta_init, const std::vector<std::vector<double>>& x_train, const std::vector<double>& y_train) {
+    int n = x_train.size();
+    int d = x_train[0].size();
+
+    auto phi = [](const std::vector<double>& x) { return x; };
+
+    auto sherman_morrison_update = [](const std::vector<double>& a, const std::vector<double>& b, const std::vector<std::vector<double>>& c, const std::vector<double>& d) {
+        std::vector<double> ab(d.size());
+        for (int i = 0; i < d.size(); ++i) {
+            ab[i] = std::inner_product(a.begin(), a.end(), c[i].begin(), 0.0);
+        }
+        double denom = 1.0 + std::accumulate(ab.begin(), ab.end(), 0.0);
+        std::vector<double> result(d.size());
+        for (int i = 0; i < d.size(); ++i) {
+            result[i] = d[i] / denom;
+        }
+        return result;
+    };
+
+    auto update = [&](const std::vector<double>& theta) {
+        std::vector<std::vector<double>> phi_x(n);
+        std::vector<double> phi_theta(n);
+        std::vector<double> errors(n);
+        std::vector<double> a(d);
+        std::vector<double> b(d);
+
+        for (int i = 0; i < n; ++i) {
+            phi_x[i] = phi(x_train[i]);
+            phi_theta[i] = std::inner_product(phi_x[i].begin(), phi_x[i].end(), theta.begin(), 0.0);
+            errors[i] = y_train[i] - phi_theta[i];
+            for (int j = 0; j < d; ++j) {
+                a[j] += phi_x[i][j] * errors[i];
+            }
+        }
+
+        b = sherman_morrison_update(theta, a, phi_x, theta);
+        std::vector<double> new_theta(d);
+        for (int i = 0; i < d; ++i) {
+            new_theta[i] = theta[i] + b[i];
+        }
+
+        double sum_squared_errors = std::accumulate(errors.begin(), errors.end(), 0.0, [](double acc, double err) { return acc + err * err; });
+        if (sum_squared_errors < 1e-6) {
+            return new_theta;
+        } else {
+            return update(new_theta);
+        }
+    };
+
+    return update(theta_init);
+}
