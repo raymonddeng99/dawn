@@ -347,3 +347,29 @@ fittedQ transitions initialQ states actions =
       initialQValues = map (\s => map (\a => initialQ s a) actions) states
   in
     iterate initialQValues transitions
+
+
+-- Least Squares Policy Evaluation
+lspe : Vect n Double -> Vect m (Vect n Double) -> Vect m Double -> Vect n Double
+lspe theta_init x_train y_train = update theta_init
+  where
+    n : Nat
+    n = length theta_init
+    d : Nat
+    d = length (head x_train)
+    phi : Vect n Double -> Vect n Double
+    phi x = x
+    sherman_morrison_update : Vect n Double -> Vect n Double -> Vect m (Vect n Double) -> Vect n Double -> Vect n Double
+    sherman_morrison_update a b c d = let ab = zipWith (*) a (map (foldl (\acc, x => acc + x * b) 0.0) (transpose c))
+                                          denom = 1.0 + foldl (+) 0.0 ab
+                                      in map (\x => x / denom) d
+    update : Vect n Double -> Vect n Double
+    update theta = let phi_x = map phi x_train
+                       phi_theta = map (\x => foldl (\acc, (xi, ti) => acc + xi * ti) 0.0 (zip x theta)) phi_x
+                       errors = zipWith (-) y_train phi_theta
+                       a = zipWith (\x, err => map (\xi => xi * err) x) phi_x errors
+                       b = sherman_morrison_update theta (foldl (\acc, x => zipWith (+) acc x) (replicate n (replicate n 0.0)) a) phi_x theta
+                       new_theta = zipWith (+) theta b
+                   in if foldl (\acc, x => acc + x * x) 0.0 errors < 1e-6
+                      then new_theta
+                      else update new_theta
