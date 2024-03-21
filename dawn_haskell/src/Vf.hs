@@ -319,3 +319,23 @@ fittedQ transitions initialQ =
            then q'
            else iterate q' trs
   in iterate (map (\ s -> map (\ a -> initialQ s a) actions) states) transitions
+
+
+-- Least Squares Policy Estimation
+lspe :: Vector Double -> [Vector Double] -> [Double] -> Vector Double
+lspe theta_init x_train y_train = update theta_init
+  where
+    n = length x_train
+    d = dim (head x_train)
+    phi = id
+    sherman_morrison_update a b c d = (d &#/ (1 + (b <# (a #> c)))) &#/ (1 + (b <.> (a #> c)))
+    update theta =
+      let phi_x = map phi x_train
+          phi_theta = map (\x -> sum (zipWith (*) x theta)) phi_x
+          errors = zipWith (-) y_train phi_theta
+          a = zipWith (\x err -> x * err) phi_x errors
+          b = sherman_morrison_update theta phi_x errors a
+          new_theta = zipWith (+) theta b
+      in if sum (map (**2) errors) < 1e-6
+         then new_theta
+         else update new_theta
