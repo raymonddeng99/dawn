@@ -385,3 +385,32 @@ let fitted_q transitions initial_q_fun =
     else iterate q_prime transitions
   in
   iterate (Array.map (fun s -> Array.map (fun a -> initial_q_fun s a) actions) states) transitions
+
+
+(* Least Squares Policy Evaluation *)
+let lspe theta_init x_train y_train =
+  let n = Array.length x_train in
+  let d = Array.length x_train.(0) in
+
+  let phi x = x in
+
+  let sherman_morrison_update a b c d =
+    let ab = Array.map2 ( *. ) a b in
+    let denom = 1. +. Array.fold_left ( +. ) 0. (Array.map2 ( *. ) ab c) in
+    Array.map (fun x -> x /. denom) d
+  in
+
+  let rec update theta =
+    let phi_x = Array.map phi x_train in
+    let phi_theta = Array.map (fun x -> Array.fold_left ( +. ) 0. (Array.map2 ( *. ) x theta)) phi_x in
+    let errors = Array.map2 (fun y y_pred -> y -. y_pred) y_train phi_theta in
+    let a = Array.map2 (fun x err -> x *. err) phi_x errors in
+    let b = sherman_morrison_update theta phi_x errors a in
+    let new_theta = Array.map2 ( +. ) theta b in
+    if Array.fold_left (fun acc x -> acc +. x **. 2.) 0. errors < 1e-6 then
+      new_theta
+    else
+      update new_theta
+  in
+
+  update theta_init
