@@ -345,3 +345,33 @@ def fitted_q(transitions, initial_q, states, actions):
 
     q = [[initial_q(s, a) for a in actions] for s in states]
     return iterate(q, transitions)
+
+
+# Least Squares Policy Evaluation
+def lspe(theta_init, x_train, y_train):
+    n = len(x_train)
+    d = len(x_train[0])
+
+    def phi(x):
+        return x
+
+    def sherman_morrison_update(a, b, c, d):
+        ab = np.dot(a, b.T)
+        denom = 1 + np.sum(ab * c)
+        return d / denom
+
+    def update(theta):
+        phi_x = [phi(x) for x in x_train]
+        phi_theta = [np.dot(x, theta) for x in phi_x]
+        errors = [y - y_pred for y, y_pred in zip(y_train, phi_theta)]
+        a = [x * err for x, err in zip(phi_x, errors)]
+        b = sherman_morrison_update(theta, np.sum(a, axis=0), phi_x, theta)
+        new_theta = theta + b
+
+        sum_squared_errors = sum(err ** 2 for err in errors)
+        if sum_squared_errors < 1e-6:
+            return new_theta
+        else:
+            return update(new_theta)
+
+    return update(theta_init)
