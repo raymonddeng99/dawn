@@ -534,3 +534,55 @@ func fittedQ(transitions [][]interface{}, initialQ func(int, int) float64, state
     }
     return iterate(q, transitions)
 }
+
+
+// Least Squares Policy Estimation
+func lspe(theta_init mat.VecDense, x_train []mat.VecDense, y_train []float64) mat.VecDense {
+    n := len(x_train)
+    d := x_train[0].Len()
+
+    phi := func(x mat.VecDense) mat.VecDense {
+        return x
+    }
+
+    sherman_morrison_update := func(a, b, c, d mat.VecDense) mat.VecDense {
+        ab := mat.NewVecDense(d.Len(), nil)
+        ab.MulElemVec(&b, &c)
+        denom := mat.Sum(ab) + 1
+        d.ScaleVec(1/denom, &d)
+        return d
+    }
+
+    var update func(theta mat.VecDense) mat.VecDense
+    update = func(theta mat.VecDense) mat.VecDense {
+        phi_x := make([]mat.VecDense, n)
+        phi_theta := make([]float64, n)
+        errors := make([]float64, n)
+        a := mat.NewVecDense(d, nil)
+        b := mat.NewVecDense(d, nil)
+
+        for i := range x_train {
+            phi_x[i] = phi(x_train[i])
+            phi_theta[i] = mat.Dot(&phi_x[i], &theta)
+            errors[i] = y_train[i] - phi_theta[i]
+            a.MulElemVec(&phi_x[i], mat.NewVecDense(d, []float64{errors[i]}))
+        }
+
+        b = sherman_morrison_update(theta, a, phi_x, b)
+        new_theta := mat.NewVecDense(d, nil)
+        new_theta.AddVec(&theta, &b)
+
+        sum_squared_errors := 0.0
+        for _, err := range errors {
+            sum_squared_errors += err * err
+        }
+
+        if sum_squared_errors < 1e-6 {
+            return new_theta
+        } else {
+            return update(new_theta)
+        }
+    }
+
+    return update(theta_init)
+}
