@@ -721,3 +721,25 @@ fn lspe(
 
     update(theta_init)
 }
+
+
+// Q OSP, Yu and Bertsekas 2007
+fn q_osp(max_iterations: usize, gamma: f64, initial_value: Vec<f64>) -> Vec<f64> {
+    q_osp_iter(0, initial_value, max_iterations, gamma)
+}
+
+fn q_osp_iter(n: usize, v: Vec<f64>, max_iterations: usize, gamma: f64) -> Vec<f64> {
+    if n == max_iterations {
+        return v;
+    }
+    q_osp_iter(n + 1, bellman_operator(&v, gamma), max_iterations, gamma)
+}
+
+fn bellman_operator(v: &[f64], gamma: f64) -> Vec<f64> {
+    v.iter().map(|&v_i| max_q(v, v_i, gamma)).collect()
+}
+
+fn max_q(v: &[f64], v_i: f64, gamma: f64) -> f64 {
+    let sum: f64 = v.iter().sum();
+    max(v_i, gamma * sum)
+}
