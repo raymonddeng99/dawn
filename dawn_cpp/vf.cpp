@@ -619,3 +619,27 @@ std::vector<double> lspe(const std::vector<double>& theta_init, const std::vecto
 
     return update(theta_init);
 }
+
+
+// Q OSP, Yu and Bertsekas 2007
+std::vector<double> qOsp(int maxIterations, double gamma, const std::vector<double>& initialValue) {
+    return qOspIter(0, initialValue, maxIterations, gamma);
+}
+
+std::vector<double> qOspIter(int n, const std::vector<double>& v, int maxIterations, double gamma) {
+    if (n == maxIterations) {
+        return v;
+    }
+    return qOspIter(n + 1, bellmanOperator(v, gamma), maxIterations, gamma);
+}
+
+std::vector<double> bellmanOperator(const std::vector<double>& v, double gamma) {
+    std::vector<double> result(v.size());
+    std::transform(v.begin(), v.end(), result.begin(), [&](double v_i) { return maxQ(v, v_i, gamma); });
+    return result;
+}
+
+double maxQ(const std::vector<double>& v, double v_i, double gamma) {
+    double sum = std::accumulate(v.begin(), v.end(), 0.0);
+    return std::max(v_i, gamma * sum);
+}
