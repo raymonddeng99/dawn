@@ -339,3 +339,18 @@ lspe theta_init x_train y_train = update theta_init
       in if sum (map (**2) errors) < 1e-6
          then new_theta
          else update new_theta
+
+
+-- Q OSP, Yu and Bertsekas 2007
+qOsp :: Int -> Double -> Array Int Double -> Array Int Double
+qOsp maxIterations gamma initialValue = qOspIter 0 initialValue
+  where
+    qOspIter n v
+      | n == maxIterations = v
+      | otherwise = qOspIter (n + 1) (bellmanOperator v)
+
+    bellmanOperator v = array (bounds v) [(i, maxQ v i) | i <- indices v]
+
+    maxQ v i = maximum [v ! i, gamma * sum [v ! j | j <- indices v]]
+
+    indices = range . bounds
