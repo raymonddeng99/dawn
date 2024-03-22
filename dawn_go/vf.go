@@ -586,3 +586,33 @@ func lspe(theta_init mat.VecDense, x_train []mat.VecDense, y_train []float64) ma
 
     return update(theta_init)
 }
+
+
+// Q OSP, Yu and Bertsekas 2007
+func qOsp(maxIterations int, gamma float64, initialValue []float64) []float64 {
+    return qOspIter(0, initialValue, maxIterations, gamma)
+}
+
+func qOspIter(n int, v []float64, maxIterations int, gamma float64) []float64 {
+    if n == maxIterations {
+        return v
+    }
+    return qOspIter(n+1, bellmanOperator(v, gamma), maxIterations, gamma)
+}
+
+func bellmanOperator(v []float64, gamma float64) []float64 {
+    result := make([]float64, len(v))
+    for i := range v {
+        result[i] = maxQ(v, i, gamma)
+    }
+    return result
+}
+
+func maxQ(v []float64, i int, gamma float64) float64 {
+    q := v[i]
+    sum := 0.0
+    for _, vj := range v {
+        sum += vj
+    }
+    return max(q, gamma*sum)
+}
