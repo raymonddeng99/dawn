@@ -414,3 +414,32 @@ let lspe theta_init x_train y_train =
   in
 
   update theta_init
+
+
+(* Q OSP, Yu and Bertsekas 2007 *)
+let q_osp max_iterations gamma =
+  let rec value_iteration n v =
+    if n = 0 then v else
+      let v' =
+        Array.mapi (fun i v_i ->
+          let max_q = Array.fold_left max (-infinity) (Array.map (fun v_j -> gamma *. (v_i +. v_j)) v) in
+          max v_i max_q
+        ) v
+      in
+      value_iteration (n - 1) v'
+  in
+
+  let rec bellman_operator v =
+    Array.mapi (fun i v_i ->
+      let max_q = Array.fold_left max (-infinity) (Array.map (fun v_j -> gamma *. v_j) v) in
+      max v_i max_q
+    ) v
+  in
+
+  let rec q_osp_iter n v =
+    if n = max_iterations then v else
+      q_osp_iter (n + 1) (bellman_operator v)
+  in
+
+  let initial_value = Array.make ... 0.0 in
+  q_osp_iter 0 initial_value
