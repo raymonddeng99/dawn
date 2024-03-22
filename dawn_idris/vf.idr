@@ -373,3 +373,19 @@ lspe theta_init x_train y_train = update theta_init
                    in if foldl (\acc, x => acc + x * x) 0.0 errors < 1e-6
                       then new_theta
                       else update new_theta
+
+
+-- Q OSP, Yu and Bertsekas 2007
+qOsp : (maxIterations : Nat) -> (gamma : Double) -> (initialValue : Vect n Double) -> Vect n Double
+qOsp maxIterations gamma initialValue = qOspIter 0 initialValue
+  where
+    qOspIter : Nat -> Vect n Double -> Vect n Double
+    qOspIter n v = case n == maxIterations of
+                        True => v
+                        False => qOspIter (n + 1) (bellmanOperator v)
+
+    bellmanOperator : Vect n Double -> Vect n Double
+    bellmanOperator v = map (maxQ v) v
+
+    maxQ : Vect n Double -> Double -> Double
+    maxQ v v_i = max v_i (gamma * sum v)
