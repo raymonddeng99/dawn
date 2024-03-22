@@ -375,3 +375,20 @@ def lspe(theta_init, x_train, y_train):
             return update(new_theta)
 
     return update(theta_init)
+
+
+# Q OSP, Yu and Bertsekas 2007
+def q_osp(max_iterations, gamma, initial_value):
+    return q_osp_iter(0, initial_value, max_iterations, gamma)
+
+def q_osp_iter(n, v, max_iterations, gamma):
+    if n == max_iterations:
+        return v
+    return q_osp_iter(n + 1, bellman_operator(v, gamma), max_iterations, gamma)
+
+def bellman_operator(v, gamma):
+    return [max_q(v, v_i, gamma) for v_i in v]
+
+def max_q(v, v_i, gamma):
+    sum_v = sum(v)
+    return max(v_i, gamma * sum_v)
