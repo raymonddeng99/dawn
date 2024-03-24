@@ -7,6 +7,8 @@ State-based require states form monotonic lattice and merge computes LUB (least 
 Op-based require delivery order exists and concurrent updates commute
 */
 
+use std::cmp::Ordering;
+
 enum Operation {
     Increment,
     Decrement,
@@ -56,5 +58,56 @@ impl Counter {
     fn update(mut self, op: Operation) -> Self {
         self.ops.push(op);
         self
+    }
+}
+
+
+
+// State based increment-only counter
+pub struct GCounter(Vec<usize>);
+
+impl GCounter {
+    pub fn create(size: usize) -> GCounter {
+        GCounter(vec![0; size])
+    }
+
+    pub fn update(&mut self, i: usize) -> Result<(), &'static str> {
+        if i >= self.0.len() {
+            return Err("Index out of bounds");
+        }
+        self.0[i] += 1;
+        Ok(())
+    }
+
+    pub fn query(&self, i: usize) -> Result<usize, &'static str> {
+        if i >= self.0.len() {
+            return Err("Index out of bounds");
+        }
+        Ok(self.0[i])
+    }
+
+    pub fn compare(&self, other: &GCounter) -> Result<Ordering, &'static str> {
+        if self.0.len() != other.0.len() {
+            return Err("Vectors have different lengths");
+        }
+        for i in 0..self.0.len() {
+            if self.0[i] < other.0[i] {
+                return Ok(Ordering::Less);
+            } else if self.0[i] > other.0[i] {
+                return Ok(Ordering::Greater);
+            }
+        }
+        Ok(Ordering::Equal)
+    }
+
+    pub fn merge(&self, other: &GCounter) -> Result<GCounter, &'static str> {
+        if self.0.len() != other.0.len() {
+            return Err("Vectors have different lengths");
+        }
+        let mut result = Vec::with_capacity(self.0.len());
+        for i in 0..self.0.len() {
+            result.push(std::cmp::max(self.0[i], other.0[i]));
+        }
+        Ok(GCounter(result))
     }
 }
