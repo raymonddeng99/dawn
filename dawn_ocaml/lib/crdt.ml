@@ -34,3 +34,46 @@ module Counter = struct
     let new_ops = operation :: ops in
     (value, new_ops)
 end
+
+(* State based increment-only counter *)
+module GCounter = struct
+  type t = int array
+
+  let create size = Array.make size 0
+
+  let update t i =
+    if i < 0 || i >= Array.length t then
+      invalid_arg "Index out of bounds"
+    else
+      t.(i) <- t.(i) + 1
+
+  let query t i =
+    if i < 0 || i >= Array.length t then
+      invalid_arg "Index out of bounds"
+    else
+      t.(i)
+
+  let compare t1 t2 =
+    if Array.length t1 <> Array.length t2 then
+      invalid_arg "Vectors have different lengths"
+    else
+      let rec loop i =
+        if i >= Array.length t1 then
+          0
+        else if t1.(i) = t2.(i) then
+          loop (i + 1)
+        else
+          compare t1.(i) t2.(i)
+      in
+      loop 0
+
+  let merge t1 t2 =
+    if Array.length t1 <> Array.length t2 then
+      invalid_arg "Vectors have different lengths"
+    else
+      let t = Array.copy t1 in
+      for i = 0 to Array.length t - 1 do
+        t.(i) <- max t1.(i) t2.(i)
+      done;
+      t
+end
