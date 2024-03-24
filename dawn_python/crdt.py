@@ -47,3 +47,34 @@ def update(counter: Counter, operation: Operation) -> Counter:
     value, ops = counter
     new_ops = ops + [operation]
     return (value, new_ops)
+
+# State based increment-only counter
+class GCounter:
+    def __init__(self, size):
+        self.data = [0] * size
+
+    def update(self, i):
+        if i < 0 or i >= len(self.data):
+            raise IndexError("Index out of bounds")
+        self.data[i] += 1
+
+    def query(self, i):
+        if i < 0 or i >= len(self.data):
+            raise IndexError("Index out of bounds")
+        return self.data[i]
+
+    def compare(self, other):
+        if len(self.data) != len(other.data):
+            raise ValueError("Vectors have different lengths")
+        for a, b in zip(self.data, other.data):
+            if a < b:
+                return -1
+            elif a > b:
+                return 1
+        return 0
+
+    def merge(self, other):
+        if len(self.data) != len(other.data):
+            raise ValueError("Vectors have different lengths")
+        result = [max(a, b) for a, b in zip(self.data, other.data)]
+        return Counter(result)
