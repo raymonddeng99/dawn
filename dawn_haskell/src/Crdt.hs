@@ -37,3 +37,44 @@ downstream = []
 
 update :: Operation -> (Int, [Operation]) -> (Int, [Operation])
 update op (value, ops) = counter (value, ops) op
+
+-- State based increment-only counter
+module GCounter (
+    Counter,
+    create,
+    update,
+    query,
+    compare,
+    merge
+) where
+
+type Counter = [Int]
+
+create :: Int -> Counter
+create size = replicate size 0
+
+update :: Counter -> Int -> Counter
+update counter i
+    | i < 0 || i >= length counter = error "Index out of bounds"
+    | otherwise = take i counter ++ [counter !! i + 1] ++ drop (i + 1) counter
+
+query :: Counter -> Int -> Int
+query counter i
+    | i < 0 || i >= length counter = error "Index out of bounds"
+    | otherwise = counter !! i
+
+compare :: Counter -> Counter -> Ordering
+compare counter1 counter2
+    | length counter1 /= length counter2 = error "Vectors have different lengths"
+    | otherwise = compareHelper 0 counter1 counter2
+    where
+        compareHelper i c1 c2
+            | i >= length c1 = EQ
+            | c1 !! i == c2 !! i = compareHelper (i + 1) c1 c2
+            | c1 !! i < c2 !! i = LT
+            | otherwise = GT
+
+merge :: Counter -> Counter -> Counter
+merge counter1 counter2
+    | length counter1 /= length counter2 = error "Vectors have different lengths"
+    | otherwise = zipWith max counter1 counter2
