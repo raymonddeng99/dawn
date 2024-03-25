@@ -118,3 +118,78 @@ func GCounterOperations() (func(GCounter, int) error, func(GCounter, int) (int, 
 
     return update, query, compare, merge
 }
+
+
+// State-based PN Counter
+type PNCounter struct {
+    p []int
+    n []int
+}
+
+func NewPNCounter(size int) *PNCounter {
+    return &PNCounter{
+        p: make([]int, size),
+        n: make([]int, size),
+    }
+}
+
+func PNCounterOperations() (
+    func(*PNCounter, int) error,
+    func(*PNCounter, int) (int, error),
+    func(*PNCounter, *PNCounter) (int, error),
+    func(*PNCounter, *PNCounter) (*PNCounter, error),
+) {
+    increment := func(c *PNCounter, i int) error {
+        if i < 0 || i >= len(c.p) {
+            return errors.New("Index out of bounds")
+        }
+        c.p[i]++
+        return nil
+    }
+
+    decrement := func(c *PNCounter, i int) error {
+        if i < 0 || i >= len(c.n) {
+            return errors.New("Index out of bounds")
+        }
+        c.n[i]++
+        return nil
+    }
+
+    value := func(c *PNCounter, i int) (int, error) {
+        if i < 0 || i >= len(c.p) {
+            return 0, errors.New("Index out of bounds")
+        }
+        return c.p[i] - c.n[i], nil
+    }
+
+    compare := func(c1, c2 *PNCounter) (int, error) {
+        if len(c1.p) != len(c2.p) || len(c1.n) != len(c2.n) {
+            return 0, errors.New("Vectors have different lengths")
+        }
+        for i := range c1.p {
+            if c1.p[i] < c2.p[i] || c1.n[i] < c2.n[i] {
+                return -1, nil
+            } else if c1.p[i] > c2.p[i] || c1.n[i] > c2.n[i] {
+                return 1, nil
+            }
+        }
+        return 0, nil
+    }
+
+    merge := func(c1, c2 *PNCounter) (*PNCounter, error) {
+        if len(c1.p) != len(c2.p) || len(c1.n) != len(c2.n) {
+            return nil, errors.New("Vectors have different lengths")
+        }
+        merged := &PNCounter{
+            p: make([]int, len(c1.p)),
+            n: make([]int, len(c1.n)),
+        }
+        for i := range c1.p {
+            merged.p[i] = max(c1.p[i], c2.p[i])
+            merged.n[i] = max(c1.n[i], c2.n[i])
+        }
+        return merged, nil
+    }
+
+    return increment, decrement, value, compare, merge
+}
