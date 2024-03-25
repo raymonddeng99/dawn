@@ -10,6 +10,7 @@ Op-based require delivery order exists and concurrent updates commute
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 #include <stdexcept>
 
 enum class Operation { Increment, Decrement };
@@ -105,4 +106,50 @@ public:
 
 private:
     std::vector<int> data;
+};
+
+
+// State-based PN Counter
+class PNCounter {
+public:
+    PNCounter(int size) : p(size, 0), n(size, 0) {}
+
+    static PNCounter initialize(int size, const std::vector<int>& p, const std::vector<int>& q) {
+        return {p, q};
+    }
+
+    void increment() {
+        int g = myID();
+        p[g]++;
+    }
+
+    void decrement() {
+        int g = myID();
+        n[g]++;
+    }
+
+    int value() const {
+        int sum_p = std::accumulate(p.begin(), p.end(), 0);
+        int sum_n = std::accumulate(n.begin(), n.end(), 0);
+        return sum_p - sum_n;
+    }
+
+    bool compare(const PNCounter& other) const {
+        return std::equal(p.begin(), p.end(), other.p.begin(), std::less_equal<int>()) &&
+               std::equal(n.begin(), n.end(), other.n.begin(), std::less_equal<int>());
+    }
+
+    PNCounter merge(const PNCounter& other) const {
+        if (p.size() != other.p.size() || n.size() != other.n.size()) {
+            throw std::invalid_argument("Vectors have different lengths");
+        }
+        PNCounter z(p.size());
+        std::transform(p.begin(), p.end(), other.p.begin(), z.p.begin(), std::max<int>);
+        std::transform(n.begin(), n.end(), other.n.begin(), z.n.begin(), std::max<int>);
+        return z;
+    }
+
+private:
+    std::vector<int> p;
+    std::vector<int> n;
 };
