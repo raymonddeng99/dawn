@@ -77,3 +77,47 @@ module GCounter = struct
       done;
       t
 end
+
+
+(* State-based PN Counter *)
+module PNCounter = struct
+  type payload = int array
+  type state = {
+    p : payload;
+    n : payload;
+  }
+
+  let initialize n p n =
+    let zeros = Array.make n 0 in
+    {p = Array.copy p; n = Array.copy n}
+
+  let increment state =
+    let g = myID () in
+    state.p.(g) <- state.p.(g) + 1;
+    state
+
+  let decrement state =
+    let g = myID () in
+    state.n.(g) <- state.n.(g) + 1;
+    state
+
+  let value state =
+    let sum_p = Array.fold_left (+) 0 state.p in
+    let sum_n = Array.fold_left (+) 0 state.n in
+    sum_p - sum_n
+
+  let compare x y =
+    let b = ref true in
+    for i = 0 to Array.length x.p - 1 do
+      b := !b && (x.p.(i) <= y.p.(i)) && (x.n.(i) <= y.n.(i))
+    done;
+    !b
+
+  let merge x y =
+    let z = {p = Array.make (Array.length x.p) 0; n = Array.make (Array.length x.n) 0} in
+    for i = 0 to Array.length z.p - 1 do
+      z.p.(i) <- max x.p.(i) y.p.(i);
+      z.n.(i) <- max x.n.(i) y.n.(i)
+    done;
+    z
+end
