@@ -78,3 +78,46 @@ merge :: Counter -> Counter -> Counter
 merge counter1 counter2
     | length counter1 /= length counter2 = error "Vectors have different lengths"
     | otherwise = zipWith max counter1 counter2
+
+-- State-based PN Counter
+module PNCounter (
+    State,
+    initialize,
+    increment,
+    decrement,
+    value,
+    compare,
+    merge
+) where
+
+type Payload = [Int]
+data State = State { p :: Payload, n :: Payload }
+
+initialize :: Int -> Payload -> Payload -> State
+initialize n p n = State (copy p) (copy n)
+  where
+    copy xs = replicate n 0
+
+increment :: State -> State
+increment (State p n) = State (update p) n
+  where
+    update xs = xs // [(g, xs !! g + 1)]
+    g = myID
+
+decrement :: State -> State
+decrement (State p n) = State p (update n)
+  where
+    update xs = xs // [(g, xs !! g + 1)]
+    g = myID
+
+value :: State -> Int
+value (State p n) = sum p - sum n
+
+compare :: State -> State -> Bool
+compare (State xp xn) (State yp yn) =
+    and [xp !! i <= yp !! i && xn !! i <= yn !! i | i <- [0 .. length xp - 1]]
+
+merge :: State -> State -> State
+merge (State xp xn) (State yp yn) = State (mergePayload xp yp) (mergePayload xn yn)
+  where
+    mergePayload xs ys = zipWith max xs ys
