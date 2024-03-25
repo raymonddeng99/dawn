@@ -111,3 +111,52 @@ impl GCounter {
         Ok(GCounter(result))
     }
 }
+
+
+// State-based PN Counter
+pub struct PNCounter {
+    p: Vec<i32>,
+    n: Vec<i32>,
+}
+
+impl PNCounter {
+    pub fn initialize(size: usize, p: Vec<i32>, n: Vec<i32>) -> PNCounter {
+        PNCounter {
+            p: p.clone(),
+            n: n.clone(),
+        }
+    }
+
+    pub fn increment(&mut self) {
+        let g = my_id();
+        self.p[g] += 1;
+    }
+
+    pub fn decrement(&mut self) {
+        let g = my_id();
+        self.n[g] += 1;
+    }
+
+    pub fn value(&self) -> i32 {
+        self.p.iter().sum::<i32>() - self.n.iter().sum::<i32>()
+    }
+
+    pub fn compare(&self, other: &PNCounter) -> bool {
+        self.p.iter().zip(&other.p).all(|(x, y)| x <= y)
+            && self.n.iter().zip(&other.n).all(|(x, y)| x <= y)
+    }
+
+    pub fn merge(&self, other: &PNCounter) -> PNCounter {
+        let mut z = PNCounter {
+            p: vec![0; self.p.len()],
+            n: vec![0; self.n.len()],
+        };
+
+        for i in 0..z.p.len() {
+            z.p[i] = self.p[i].max(other.p[i]);
+            z.n[i] = self.n[i].max(other.n[i]);
+        }
+
+        z
+    }
+}
