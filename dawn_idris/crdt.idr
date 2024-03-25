@@ -71,3 +71,51 @@ public export
 merge : (c1 : GCounter n) -> (c2 : GCounter n) -> GCounter n
 merge (MkGCounter len vec1) (MkGCounter _ vec2) =
   MkGCounter len $ zipWith max vec1 vec2
+
+
+-- State based PN Counter
+module PNCounter
+
+%default total
+
+public export
+record PNCounter : (n : Nat) where
+    MkPNCounter : Vect n Int -> Vect n Int -> PNCounter n
+
+public export
+initialize : (n : Nat) -> Vect n Int -> Vect n Int -> PNCounter n
+initialize n p q = MkPNCounter p q
+
+public export
+increment : (state : PNCounter n) -> PNCounter n
+increment (MkPNCounter p n) = MkPNCounter (updateAt g increment' p) n
+    where
+        g : Fin n
+        g = myID
+
+        increment' : Int -> Int
+        increment' x = x + 1
+
+public export
+decrement : (state : PNCounter n) -> PNCounter n
+decrement (MkPNCounter p n) = MkPNCounter p (updateAt g increment' n)
+    where
+        g : Fin n
+        g = myID
+
+        increment' : Int -> Int
+        increment' x = x + 1
+
+public export
+value : (state : PNCounter n) -> Int
+value (MkPNCounter p n) = sum p - sum n
+
+public export
+compare : (state1 : PNCounter n) -> (state2 : PNCounter n) -> Bool
+compare (MkPNCounter xp xn) (MkPNCounter yp yn) =
+    all (\i => xp ! i <= yp ! i && xn ! i <= yn ! i) (range 0 (length xp))
+
+public export
+merge : (state1 : PNCounter n) -> (state2 : PNCounter n) -> PNCounter n
+merge (MkPNCounter xp xn) (MkPNCounter yp yn) =
+    MkPNCounter (zipWith max xp yp) (zipWith max xn yn)
