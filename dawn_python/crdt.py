@@ -78,3 +78,39 @@ class GCounter:
             raise ValueError("Vectors have different lengths")
         result = [max(a, b) for a, b in zip(self.data, other.data)]
         return Counter(result)
+
+# State-based PN Counter
+class PNCounter:
+    def __init__(self, size):
+        self.p = [0] * size
+        self.n = [0] * size
+
+    @classmethod
+    def initialize(cls, n, p, q):
+        return cls(p, q)
+
+    def increment(self):
+        g = my_id()
+        self.p[g] += 1
+
+    def decrement(self):
+        g = my_id()
+        self.n[g] += 1
+
+    def value(self):
+        return sum(self.p) - sum(self.n)
+
+    @staticmethod
+    def compare(x, y):
+        for i in range(len(x.p)):
+            if x.p[i] > y.p[i] or x.n[i] > y.n[i]:
+                return False
+        return True
+
+    @staticmethod
+    def merge(x, y):
+        z = PNCounter(len(x.p))
+        for i in range(len(x.p)):
+            z.p[i] = max(x.p[i], y.p[i])
+            z.n[i] = max(x.n[i], y.n[i])
+        return z
