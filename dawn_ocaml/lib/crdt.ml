@@ -121,3 +121,32 @@ module PNCounter = struct
     done;
     z
 end
+
+(* State-based last-writer-wins register *)
+module LastWriterWinsRegister = struct
+  type value = int
+  type timestamp = float
+
+  type register = {
+    value : value;
+    timestamp : timestamp;
+  }
+
+  let create initial_value =
+    { value = initial_value; timestamp = 0.0 }
+
+  let read register =
+    register.value
+
+  let write register new_value new_timestamp =
+    if new_timestamp > register.timestamp then
+      { value = new_value; timestamp = new_timestamp }
+    else
+      register
+
+  let compare_and_swap register expected_value expected_timestamp new_value new_timestamp =
+    if register.value = expected_value && register.timestamp = expected_timestamp then
+      { value = new_value; timestamp = new_timestamp }
+    else
+      register
+end
