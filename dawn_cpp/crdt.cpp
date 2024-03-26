@@ -12,6 +12,8 @@ Op-based require delivery order exists and concurrent updates commute
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
+#include <atomic>
+#include <utility>
 
 enum class Operation { Increment, Decrement };
 
@@ -152,4 +154,49 @@ public:
 private:
     std::vector<int> p;
     std::vector<int> n;
+};
+
+
+// State-based last-writer-wins register
+template <typename T>
+class LastWriterWinsRegister {
+private:
+    std::atomic<T> value;
+    std::atomic<double> timestamp;
+
+public:
+    LastWriterWinsRegister(T initialValue) : value(initialValue), timestamp(0.0) {}
+
+    T read() const {
+        return value.load(std::memory_order_acquire);
+    }
+
+    void write(T newValue, double newTimestamp) {
+        T oldValue = value.load(std::memory_order_relaxed);
+        double oldTimestamp = timestamp.load(std::memory_order_relaxed);
+
+        while (newTimestamp > oldTimestamp &&
+               !std::atomic_compare_exchange_strong(
+                   &value, &oldValue, newValue,
+                   std::memory_order_acq_rel,
+                   std::memory_order_relaxed)) {
+            oldTimestamp = timestamp.load(std::memory_order_relaxed);
+        }
+
+        if (newTimestamp > oldTimestamp) {
+            timestamp.store(newTimestamp, std::memory_order_release);
+        }
+    }
+
+    bool compareAndSwap(T expectedValue, double expectedTimestamp, T newValue, double newTimestamp) {
+        T oldValue = value.load(std::memory_order_acquire);
+        double oldTimestamp = timestamp.load(std::memory_order_acquire);
+
+        if (oldValue == expectedValue && oldTimestamp == expectedTimestamp) {
+            write(newValue, newTimestamp);
+            return true;
+        }
+
+        return false;
+    }
 };
