@@ -9,6 +9,7 @@ Op-based require delivery order exists and concurrent updates commute
 
 from enum import Enum
 from typing import List, Tuple
+from threading import Lock
 
 class Operation(Enum):
     Increment = 1
@@ -114,3 +115,28 @@ class PNCounter:
             z.p[i] = max(x.p[i], y.p[i])
             z.n[i] = max(x.n[i], y.n[i])
         return z
+
+# State-based last-writer-wins register
+class LastWriterWinsRegister:
+    def __init__(self, initial_value):
+        self.value = initial_value
+        self.timestamp = 0.0
+        self.lock = Lock()
+
+    def read(self):
+        with self.lock:
+            return self.value
+
+    def write(self, new_value, new_timestamp):
+        with self.lock:
+            if new_timestamp > self.timestamp:
+                self.value = new_value
+                self.timestamp = new_timestamp
+
+    def compare_and_swap(self, expected_value, expected_timestamp, new_value, new_timestamp):
+        with self.lock:
+            if self.value == expected_value and self.timestamp == expected_timestamp:
+                self.value = new_value
+                self.timestamp = new_timestamp
+                return True
+            return False
