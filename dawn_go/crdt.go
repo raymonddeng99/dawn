@@ -193,3 +193,42 @@ func PNCounterOperations() (
 
     return increment, decrement, value, compare, merge
 }
+
+
+// State-based last-writer-wins register
+type LastWriterWinsRegister struct {
+    value     int64
+    timestamp int64
+}
+
+func NewLastWriterWinsRegister(initialValue int64) *LastWriterWinsRegister {
+    return &LastWriterWinsRegister{value: initialValue, timestamp: 0}
+}
+
+func (r *LastWriterWinsRegister) Read() int64 {
+    return atomic.LoadInt64(&r.value)
+}
+
+func (r *LastWriterWinsRegister) Write(newValue, newTimestamp int64) {
+    for {
+        oldValue := r.Read()
+        oldTimestamp := atomic.LoadInt64(&r.timestamp)
+        if newTimestamp <= oldTimestamp {
+            return
+        }
+        if atomic.CompareAndSwapInt64(&r.value, oldValue, newValue) &&
+            atomic.CompareAndSwapInt64(&r.timestamp, oldTimestamp, newTimestamp) {
+            return
+        }
+    }
+}
+
+func (r *LastWriterWinsRegister) CompareAndSwap(expectedValue int64, expectedTimestamp int64, newValue int64, newTimestamp int64) bool {
+    oldValue := r.Read()
+    oldTimestamp := atomic.LoadInt64(&r.timestamp)
+    if oldValue == expectedValue && oldTimestamp == expectedTimestamp {
+        r.Write(newValue, newTimestamp)
+        return true
+    }
+    return false
+}
