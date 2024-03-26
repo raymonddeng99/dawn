@@ -9,6 +9,7 @@ Op-based require delivery order exists and concurrent updates commute
 
 
 import Data.List (foldl')
+import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
 
 data Operation = Increment | Decrement deriving (Show, Eq)
 
@@ -121,3 +122,30 @@ merge :: State -> State -> State
 merge (State xp xn) (State yp yn) = State (mergePayload xp yp) (mergePayload xn yn)
   where
     mergePayload xs ys = zipWith max xs ys
+
+
+-- State-based last-writer-wins register
+module LastWriterWinsRegister (Register, create, read, write, compareAndSwap) where
+
+data Register a = Register { value :: a, timestamp :: Float }
+
+create :: a -> IO (IORef (Register a))
+create initialValue = newIORef (Register initialValue 0.0)
+
+read :: IORef (Register a) -> IO a
+read ref = do
+  Register v _ <- readIORef ref
+  return v
+
+write :: IORef (Register a) -> a -> Float -> IO ()
+write ref newValue newTimestamp = atomicModifyIORef ref $ \(Register v t) ->
+  if newTimestamp > t
+    then (Register newValue newTimestamp, ())
+    else (Register v t, ())
+
+compareAndSwap :: IORef (Register a) -> a -> Float -> a -> Float -> IO Bool
+compareAndSwap ref expectedValue expectedTimestamp newValue newTimestamp =
+  atomicModifyIORef ref $ \(Register v t) ->
+    if v == expectedValue && t == expectedTimestamp
+      then (Register newValue newTimestamp, True)
+      else (Register v t, False)
