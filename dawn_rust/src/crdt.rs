@@ -8,6 +8,8 @@ Op-based require delivery order exists and concurrent updates commute
 */
 
 use std::cmp::Ordering;
+use std::sync::atomic::{AtomicI64, Ordering};
+
 
 enum Operation {
     Increment,
@@ -158,5 +160,69 @@ impl PNCounter {
         }
 
         z
+    }
+}
+
+
+// State-based last-writer-wins register
+struct LastWriterWinsRegister {
+    value: AtomicI64,
+    timestamp: AtomicI64,
+}
+
+impl LastWriterWinsRegister {
+    fn new(initial_value: i64) -> LastWriterWinsRegister {
+        LastWriterWinsRegister {
+            value: AtomicI64::new(initial_value),
+            timestamp: AtomicI64::new(0),
+        }
+    }
+
+    fn read(&self) -> i64 {
+        self.value.load(Ordering::Acquire)
+    }
+
+    fn write(&self, new_value: i64, new_timestamp: i64) {
+        loop {
+            let old_timestamp = self.timestamp.load(Ordering::Acquire);
+            if new_timestamp <= old_timestamp {
+                return;
+            }
+
+            let old_value = self.value.swap(new_value, Ordering::AcqRel);
+            if self
+                .timestamp
+                .compare_exchange(
+                    old_timestamp,
+                    new_timestamp,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                return;
+            }
+
+            // Retry if the timestamps didn't match
+            self.value.swap(old_value, Ordering::AcqRel);
+        }
+    }
+
+    fn compare_and_swap(
+        &self,
+        expected_value: i64,
+        expected_timestamp: i64,
+        new_value: i64,
+        new_timestamp: i64,
+    ) -> bool {
+        let old_value = self.value.load(Ordering::Acquire);
+        let old_timestamp = self.timestamp.load(Ordering::Acquire);
+
+        if old_value == expected_value && old_timestamp == expected_timestamp {
+            self.write(new_value, new_timestamp);
+            true
+        } else {
+            false
+        }
     }
 }
