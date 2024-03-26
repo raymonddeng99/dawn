@@ -119,3 +119,36 @@ public export
 merge : (state1 : PNCounter n) -> (state2 : PNCounter n) -> PNCounter n
 merge (MkPNCounter xp xn) (MkPNCounter yp yn) =
     MkPNCounter (zipWith max xp yp) (zipWith max xn yn)
+
+
+-- State-based last-writer-wins register
+public export
+record LastWriterWinsRegister a where
+  constructor MkLastWriterWinsRegister
+  value     : a
+  timestamp : Double
+
+export
+create : a -> IO (IORef (LastWriterWinsRegister a))
+create initialValue = newIORef (MkLastWriterWinsRegister initialValue 0.0)
+
+export
+read : IORef (LastWriterWinsRegister a) -> IO a
+read ref = do
+  MkLastWriterWinsRegister v _ <- readIORef ref
+  pure v
+
+export
+write : IORef (LastWriterWinsRegister a) -> a -> Double -> IO ()
+write ref newValue newTimestamp = atomicModifyIORef ref $ \(MkLastWriterWinsRegister v t) =>
+  if newTimestamp > t
+     then (MkLastWriterWinsRegister newValue newTimestamp, ())
+     else (MkLastWriterWinsRegister v t, ())
+
+export
+compareAndSwap : IORef (LastWriterWinsRegister a) -> a -> Double -> a -> Double -> IO Bool
+compareAndSwap ref expectedValue expectedTimestamp newValue newTimestamp =
+  atomicModifyIORef ref $ \(MkLastWriterWinsRegister v t) =>
+    if v == expectedValue && t == expectedTimestamp
+       then (MkLastWriterWinsRegister newValue newTimestamp, True)
+       else (MkLastWriterWinsRegister v t, False)
