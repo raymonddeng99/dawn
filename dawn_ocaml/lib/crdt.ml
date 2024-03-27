@@ -150,3 +150,46 @@ module LastWriterWinsRegister = struct
     else
       register
 end
+
+
+(* Op-based last-writer-wins register *)
+module OpBasedLWWRegister = struct
+  type value = int
+  type tim
+  type op =
+    | Update of value * timestamp
+    | Reset
+
+  type register = {
+    value    timestamp : timestamp;
+    pending : op list;
+  }
+
+  let create initial_value =
+    { value = initial_value; timestamp = 0.0; pending = [] }
+
+  let read register =
+    register.value
+
+  let update register new_value new_timestamp =
+    if new_timestamp > register.timestamp then
+      { value = new_value; timestamp = new_timestamp; pending = [] }
+    else
+      { register with pending = Update (new_value, new_timestamp) :: register.pending }
+
+  let reset register =
+    { register with pending = Reset :: register.pending }
+
+  let rec apply_pending register =
+    match register.pending with
+    | [] -> register
+    | Update (v, t) :: rest ->
+       let new_reg = update register v t in
+       apply_pending { new_reg with pending = rest }
+    | Reset :: rest ->
+       let new_reg = { register with value = 0; timestamp = 0.0 } in
+       apply_pending { new_reg with pending = rest }
+
+  let downstream register =
+    apply_pending register
+end
