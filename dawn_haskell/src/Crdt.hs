@@ -149,3 +149,50 @@ compareAndSwap ref expectedValue expectedTimestamp newValue newTimestamp =
     if v == expectedValue && t == expectedTimestamp
       then (Register newValue newTimestamp, True)
       else (Register v t, False)
+
+
+-- Op-based last-writer-wins register
+module OpBasedLWWRegister (Register, create, read, update, reset, downstream) where
+
+import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
+
+data Value = Value Int Float
+  deriving (Eq, Show)
+
+data Op = Update Value | Reset
+  deriving (Eq, Show)
+
+data Register = Register { value :: Value, pending :: [Op] }
+  deriving (Eq, Show)
+
+create :: Int -> IO (IORef Register)
+create initialValue = newIORef (Register (Value initialValue 0.0) [])
+
+read :: IORef Register -> IO Int
+read ref = do
+  Register (Value v _) _ <- readIORef ref
+  return v
+
+update :: IORef Register -> Int -> Float -> IO ()
+update ref newValue newTimestamp = atomicModifyIORef ref $ \(Register (Value v t) pending) ->
+  if newTimestamp > t
+    then (Register (Value newValue newTimestamp) [], ())
+    else (Register (Value v t) (Update (Value newValue newTimestamp) : pending), ())
+
+reset :: IORef Register -> IO ()
+reset ref = atomicModifyIORef ref $ \(Register v pending) ->
+  (Register v (Reset : pending), ())
+
+applyPending :: Register -> Register
+applyPending (Register v []) = Register v []
+applyPending (Register v (Update newV : ops)) =
+  let Register v' ops' = applyPending (Register newV ops)
+  in applyPending (Register (max v' newV) ops')
+applyPending (Register _ (Reset : ops)) =
+  applyPending (Register (Value 0 0.0) ops)
+
+downstream :: IORef Register -> IO Register
+downstream ref = do
+  reg <- readIORef ref
+  writeIORef ref (applyPending reg)
+  readIORef ref
