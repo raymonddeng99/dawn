@@ -11,6 +11,7 @@ Op-based require delivery order exists and concurrent updates commute
 package main
 
 import "fmt"
+import "sync/atomic"
 
 type Operation int
 
@@ -231,4 +232,64 @@ func (r *LastWriterWinsRegister) CompareAndSwap(expectedValue int64, expectedTim
         return true
     }
     return false
+}
+
+
+// Operation-based last-write-wins register
+type OpBasedLWWValue struct {
+    val int64
+    ts  int64
+}
+
+type OpBasedLWWOp int
+
+const (
+    OpBasedLWWUpdate OpBasedLWWOp = iota
+    OpBasedLWWReset
+)
+
+type OpBasedLWWRegister struct {
+    value   OpBasedLWWValue
+    pending []OpBasedLWWOp
+}
+
+func NewOpBasedLWWRegister(initialValue int64) *OpBasedLWWRegister {
+    return &OpBasedLWWRegister{value: OpBasedLWWValue{val: initialValue, ts: 0}, pending: []OpBasedLWWOp{}}
+}
+
+func (r *OpBasedLWWRegister) Read() int64 {
+    return r.value.val
+}
+
+func (r *OpBasedLWWRegister) Update(newValue, newTimestamp int64) {
+    oldValue := r.value
+    if newTimestamp > oldValue.ts {
+        r.value = OpBasedLWWValue{val: newValue, ts: newTimestamp}
+        r.pending = []OpBasedLWWOp{}
+    } else {
+        r.pending = append(r.pending, OpBasedLWWUpdate)
+    }
+}
+
+func (r *OpBasedLWWRegister) Reset() {
+    r.pending = append(r.pending, OpBasedLWWReset)
+}
+
+func (r *OpBasedLWWRegister) ApplyPending() {
+    for _, op := range r.pending {
+        switch op {
+        case OpBasedLWWUpdate:
+            if r.pending[0].ts > r.value.ts {
+                r.value = OpBasedLWWValue{val: r.pending[0].val, ts: r.pending[0].ts}
+                r.pending = r.pending[1:]
+            }
+        case OpBasedLWWReset:
+            r.value = OpBasedLWWValue{val: 0, ts: 0}
+            r.pending = r.pending[1:]
+        }
+    }
+}
+
+func (r *OpBasedLWWRegister) Downstream() {
+    r.ApplyPending()
 }
