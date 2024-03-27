@@ -10,7 +10,6 @@ Op-based require delivery order exists and concurrent updates commute
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-
 enum Operation {
     Increment,
     Decrement,
@@ -224,5 +223,78 @@ impl LastWriterWinsRegister {
         } else {
             false
         }
+    }
+}
+
+
+// Operation-based last-writer-wins register
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct OpBasedLWWValue {
+    val: i64,
+    ts: i64,
+}
+
+impl OpBasedLWWValue {
+    fn new(val: i64, ts: i64) -> Self {
+        OpBasedLWWValue { val, ts }
+    }
+}
+
+enum OpBasedLWWOp {
+    Update(OpBasedLWWValue),
+    Reset,
+}
+
+struct OpBasedLWWRegister {
+    value: OpBasedLWWValue,
+    pending: Vec<OpBasedLWWOp>,
+}
+
+impl OpBasedLWWRegister {
+    fn new(initial_value: i64) -> OpBasedLWWRegister {
+        OpBasedLWWRegister {
+            value: OpBasedLWWValue::new(initial_value, 0),
+            pending: Vec::new(),
+        }
+    }
+
+    fn read(&self) -> i64 {
+        self.value.val
+    }
+
+    fn update(&mut self, new_value: i64, new_timestamp: i64) {
+        if new_timestamp > self.value.ts {
+            self.value = OpBasedLWWValue::new(new_value, new_timestamp);
+            self.pending.clear();
+        } else {
+            self.pending.push(OpBasedLWWOp::Update(OpBasedLWWValue::new(new_value, new_timestamp)));
+        }
+    }
+
+    fn reset(&mut self) {
+        self.pending.push(OpBasedLWWOp::Reset);
+    }
+
+    fn apply_pending(&mut self) {
+        let mut new_pending = Vec::new();
+        for op in self.pending.drain(..) {
+            match op {
+                OpBasedLWWOp::Update(value) => {
+                    if value.ts > self.value.ts {
+                        self.value = value;
+                    } else {
+                        new_pending.push(OpBasedLWWOp::Update(value));
+                    }
+                }
+                OpBasedLWWOp::Reset => {
+                    self.value = OpBasedLWWValue::new(0, 0);
+                }
+            }
+        }
+        self.pending = new_pending;
+    }
+
+    fn downstream(&mut self) {
+        self.apply_pending();
     }
 }
