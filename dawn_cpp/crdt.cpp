@@ -14,6 +14,7 @@ Op-based require delivery order exists and concurrent updates commute
 #include <stdexcept>
 #include <atomic>
 #include <utility>
+#include <mutex>
 
 enum class Operation { Increment, Decrement };
 
@@ -198,5 +199,71 @@ public:
         }
 
         return false;
+    }
+};
+
+
+// Operation-based last-writer-wins register
+struct OpBasedLWWValue {
+    int val;
+    double ts;
+
+    OpBasedLWWValue(int val, double ts) : val(val), ts(ts) {}
+};
+
+enum class OpType { Update, Reset };
+
+class OpBasedLWWRegister {
+private:
+    std::atomic<OpBasedLWWValue> value;
+    std::vector<std::pair<OpType, OpBasedLWWValue>> pending;
+    std::mutex mtx;
+
+public:
+    OpBasedLWWRegister(int initialValue)
+        : value(OpBasedLWWValue(initialValue, 0.0)), pending() {}
+
+    int read() const {
+        return value.load(std::memory_order_acquire).val;
+    }
+
+    void update(int newValue, double newTimestamp) {
+        std::lock_guard<std::mutex> lock(mtx);
+        OpBasedLWWValue oldValue = value.load(std::memory_order_relaxed);
+        if (newTimestamp > oldValue.ts) {
+            value.store(OpBasedLWWValue(newValue, newTimestamp), std::memory_order_release);
+            pending.clear();
+        } else {
+            pending.emplace_back(OpType::Update, OpBasedLWWValue(newValue, newTimestamp));
+        }
+    }
+
+    void reset() {
+        std::lock_guard<std::mutex> lock(mtx);
+        pending.emplace_back(OpType::Reset, OpBasedLWWValue(0, 0.0));
+    }
+
+    void applyPending() {
+        std::vector<std::pair<OpType, OpBasedLWWValue>> newPending;
+        for (const auto& [op, arg] : pending) {
+            switch (op) {
+            case OpType::Update:
+                if (arg.ts > value.load(std::memory_order_relaxed).ts) {
+                    value.store(arg, std::memory_order_release);
+                } else {
+                    newPending.emplace_back(OpType::Update, arg);
+                }
+                break;
+            case OpType::Reset:
+                value.store(OpBasedLWWValue(0, 0.0), std::memory_order_release);
+                break;
+            }
+        }
+        pending = std::move(newPending);
+    }
+
+    void downstream() {
+        std::lock_guard<std::mutex> lock(mtx);
+        applyPending();
     }
 };
