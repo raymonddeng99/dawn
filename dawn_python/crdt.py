@@ -140,3 +140,46 @@ class LastWriterWinsRegister:
                 self.timestamp = new_timestamp
                 return True
             return False
+
+
+# Operation-based last-writer-wins register
+class OpBasedLWWValue:
+    def __init__(self, val, ts):
+        self.val = val
+        self.ts = ts
+
+class OpBasedLWWRegister:
+    def __init__(self, initial_value):
+        self.value = OpBasedLWWValue(initial_value, 0.0)
+        self.pending = []
+        self.lock = Lock()
+
+    def read(self):
+        with self.lock:
+            return self.value.val
+
+    def update(self, new_value, new_timestamp):
+        with self.lock:
+            if new_timestamp > self.value.ts:
+                self.value = OpBasedLWWValue(new_value, new_timestamp)
+                self.pending.clear()
+            else:
+                self.pending.append(("update", OpBasedLWWValue(new_value, new_timestamp)))
+
+    def reset(self):
+        with self.lock:
+            self.pending.append(("reset", None))
+
+    def apply_pending(self):
+        with self.lock:
+            for op, arg in self.pending:
+                if op == "update":
+                    if arg.ts > self.value.ts:
+                        self.value = arg
+                elif op == "reset":
+                    self.value = OpBasedLWWValue(0, 0.0)
+            self.pending.clear()
+
+    def downstream(self):
+        with self.lock:
+            self.apply_pending()
