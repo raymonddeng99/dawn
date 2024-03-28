@@ -193,3 +193,47 @@ module OpBasedLWWRegister = struct
   let downstream register =
     apply_pending register
 end
+
+(* State-based multi-value register *)
+module MVRegister = struct
+  type x = int
+  type version = int array
+
+  type payload = (x * version) list
+
+  let initial = [(-1, Array.make 0 0)]
+
+  let query_increment_vv () =
+    let g = myID () in
+    let vs = List.map snd initial in
+    let v' = Array.map (fun v -> Array.fold_left max v vs |> (+) 1) vs in
+    v'.(g) <- v'.(g) + 1;
+    v'
+
+  let update_assign (set_r : x list) =
+    let v = query_increment_vv () in
+    List.map (fun x -> (x, v)) set_r @ initial
+
+  let query_value () =
+    initial
+
+  let compare (a : payload) (b : payload) =
+    List.exists (fun (x, v) ->
+      List.exists (fun (x', v') -> Array.exists ((<) v') v) b
+    ) a
+
+  let merge (a : payload) (b : payload) =
+    let a' = List.filter (fun (x, v) ->
+      List.exists (fun (y, w) ->
+        Array.exists (fun v' -> v' >= v.(Array.length v - 1)) w ||
+        Array.exists ((<) v') v
+      ) b
+    ) a in
+    let b' = List.filter (fun (y, w) ->
+      List.exists (fun (x, v) ->
+        Array.exists (fun v' -> v' >= w.(Array.length w - 1)) v ||
+        Array.exists ((<) w') w
+      ) a
+    ) b in
+    a' @ b'
+end
