@@ -293,3 +293,121 @@ func (r *OpBasedLWWRegister) ApplyPending() {
 func (r *OpBasedLWWRegister) Downstream() {
     r.ApplyPending()
 }
+
+
+// State-based multi-value register
+type MVRegisterValue struct {
+    x interface{}
+    v []int64
+}
+
+type MVRegister struct {
+    payload []MVRegisterValue
+}
+
+func NewMVRegister() *MVRegister {
+    return &MVRegister{
+        payload: []MVRegisterValue{
+            {x: nil, v: []int64{}},
+        },
+    }
+}
+
+func (r *MVRegister) QueryIncrementVV(processID int) []int64 {
+    maxVersion := int64(0)
+    for _, entry := range r.payload {
+        for _, v := range entry.v {
+            if v > maxVersion {
+                maxVersion = v
+            }
+        }
+    }
+    maxVersion++
+
+    newVersion := make([]int64, len(r.payload))
+    for i := range newVersion {
+        newVersion[i] = maxVersion
+    }
+    newVersion[processID]++
+
+    return newVersion
+}
+
+func (r *MVRegister) UpdateAssign(set_r []interface{}, processID int) {
+    newVersion := r.QueryIncrementVV(processID)
+    for _, x := range set_r {
+        r.payload = append(r.payload, MVRegisterValue{x: x, v: newVersion})
+    }
+}
+
+func (r *MVRegister) QueryValue() []MVRegisterValue {
+    return r.payload
+}
+
+func (r *MVRegister) Compare(other *MVRegister) bool {
+    for _, entryA := range r.payload {
+        for _, entryB := range other.payload {
+            if entryA.x == entryB.x {
+                for _, vA := range entryA.v {
+                    if allLessThan(vA, entryB.v) {
+                        return true
+                    }
+                }
+            }
+        }
+    }
+    return false
+}
+
+func allLessThan(val int64, arr []int64) bool {
+    for _, v := range arr {
+        if val <= v {
+            return false
+        }
+    }
+    return true
+}
+
+func (r *MVRegister) Merge(other *MVRegister) *MVRegister {
+    merged := NewMVRegister()
+    for _, entryA := range r.payload {
+        include := false
+        for _, entryB := range other.payload {
+            if entryA.x == entryB.x {
+                if !allLessThan(entryB.v[len(entryB.v)-1], entryA.v) || anyLessThan(entryA.v, entryB.v) {
+                    include = true
+                    break
+                }
+            }
+        }
+        if include {
+            merged.payload = append(merged.payload, entryA)
+        }
+    }
+
+    for _, entryB := range other.payload {
+        include := false
+        for _, entryA := range r.payload {
+            if entryB.x == entryA.x {
+                if !allLessThan(entryA.v[len(entryA.v)-1], entryB.v) || anyLessThan(entryB.v, entryA.v) {
+                    include = true
+                    break
+                }
+            }
+        }
+        if include {
+            merged.payload = append(merged.payload, entryB)
+        }
+    }
+
+    return merged
+}
+
+func anyLessThan(arr []int64, val int64) bool {
+    for _, v := range arr {
+        if v < val {
+            return true
+        }
+    }
+    return false
+}
