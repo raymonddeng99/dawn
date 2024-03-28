@@ -183,3 +183,65 @@ class OpBasedLWWRegister:
     def downstream(self):
         with self.lock:
             self.apply_pending()
+
+
+# State-based multi-value register
+class MVRegisterValue:
+    def __init__(self, x, v):
+        self.x = x
+        self.v = v
+
+class MVRegister:
+    def __init__(self):
+        self.payload = [MVRegisterValue(-1, [])]
+        self.lock = Lock()
+
+    def query_increment_vv(self, process_id):
+        with self.lock:
+            max_version = max(max(v, default=0) for _, v in self.payload) + 1
+            new_version = [max_version] * len(self.payload)
+            new_version[process_id] += 1
+            return new_version
+
+    def update_assign(self, set_r, process_id):
+        with self.lock:
+            new_version = self.query_increment_vv(process_id)
+            self.payload.extend(
+                MVRegisterValue(x, new_version.copy()) for x in set_r
+            )
+
+    def query_value(self):
+        with self.lock:
+            return self.payload
+
+    def compare(self, other):
+        with self.lock:
+            return any(
+                any(
+                    all(v_entry > v_entry_ for v_entry_ in v_)
+                    for v in other.payload
+                    if x_ == x
+                )
+                for x, v in self.payload
+            )
+
+    def merge(self, other):
+        with self.lock:
+            merged = set()
+            for x, v in self.payload:
+                if any(
+                    max(w, default=0) >= v[-1]
+                    or any(v_entry > w_entry for w_entry in w)
+                    for _, w in other.payload
+                    if x_ == x
+                ):
+                    merged.add((x, tuple(v)))
+            for y, w in other.payload:
+                if any(
+                    max(v, default=0) >= w[-1]
+                    or any(w_entry < v_entry for v_entry in v)
+                    for _, v in self.payload
+                    if x == y
+                ):
+                    merged.add((y, tuple(w)))
+            return [MVRegisterValue(x, list(v)) for x, v in merged]
