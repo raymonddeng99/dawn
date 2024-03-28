@@ -267,3 +267,94 @@ public:
         applyPending();
     }
 };
+
+// State-based multi-value register
+struct MVRegisterValue {
+    int x;
+    std::vector<int64_t> v;
+
+    MVRegisterValue(int x, const std::vector<int64_t>& v) : x(x), v(v) {}
+};
+
+class MVRegister {
+private:
+    std::vector<MVRegisterValue> payload;
+
+public:
+    MVRegister() {
+        payload.emplace_back(MVRegisterValue(-1, std::vector<int64_t>{}));
+    }
+
+    std::vector<int64_t> queryIncrementVV(int processID) {
+        int64_t maxVersion = 0;
+        for (const auto& entry : payload) {
+            for (const auto& v : entry.v) {
+                maxVersion = std::max(maxVersion, v);
+            }
+        }
+        maxVersion++;
+
+        std::vector<int64_t> newVersion(payload.size(), maxVersion);
+        newVersion[processID]++;
+        return newVersion;
+    }
+
+    void updateAssign(const std::vector<int>& set_r, int processID) {
+        std::vector<int64_t> newVersion = queryIncrementVV(processID);
+        for (int x : set_r) {
+            payload.emplace_back(MVRegisterValue(x, newVersion));
+        }
+    }
+
+    const std::vector<MVRegisterValue>& queryValue() const {
+        return payload;
+    }
+
+    bool compare(const MVRegister& other) const {
+        for (const auto& entryA : payload) {
+            for (const auto& entryB : other.payload) {
+                if (entryA.x == entryB.x) {
+                    for (const auto& vA : entryA.v) {
+                        if (std::all_of(entryB.v.begin(), entryB.v.end(), [&vA](int64_t vB) { return vA > vB; })) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    MVRegister merge(const MVRegister& other) const {
+        MVRegister merged;
+        auto includeEntry = [&](const MVRegisterValue& entry, const std::vector<MVRegisterValue>& otherPayload) {
+            return std::any_of(otherPayload.begin(), otherPayload.end(), [&entry](const MVRegisterValue& otherEntry) {
+                const auto& [x, v] = entry;
+                const auto& [x_, w] = otherEntry;
+                if (x == x_) {
+                    return *std::max_element(w.begin(), w.end()) >= v.back() ||
+                           std::any_of(v.begin(), v.end(), [&w](int64_t vEntry) {
+                               return std::all_of(w.begin(), w.end(), [vEntry](int64_t wEntry) {
+                                   return vEntry > wEntry;
+                               });
+                           });
+                }
+                return false;
+            });
+        };
+
+        for (const auto& entry : payload) {
+            if (includeEntry(entry, other.payload)) {
+                merged.payload.push_back(entry);
+            }
+        }
+
+        for (const auto& otherEntry : other.payload) {
+            if (includeEntry(otherEntry, payload)) {
+                merged.payload.push_back(otherEntry);
+            }
+        }
+
+        return merged;
+    }
+};
