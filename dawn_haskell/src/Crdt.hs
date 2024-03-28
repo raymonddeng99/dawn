@@ -8,8 +8,9 @@ Op-based require delivery order exists and concurrent updates commute
 -}
 
 
-import Data.List (foldl')
+import Data.List (foldl', nub)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
+import Data.Array (Array, (!), (//), accumArray, elems, listArray, range)
 
 data Operation = Increment | Decrement deriving (Show, Eq)
 
@@ -196,3 +197,47 @@ downstream ref = do
   reg <- readIORef ref
   writeIORef ref (applyPending reg)
   readIORef ref
+
+-- State-based multi-value register
+module MVRegister (
+    MVRegister,
+    initial,
+    queryIncrementVV,
+    updateAssign,
+    queryValue,
+    compare,
+    merge
+) where
+
+type X = Int
+type Version = Array Int Int
+
+type Payload = [(X, Version)]
+
+initial :: Payload
+initial = [(-1, listArray (0, 0) [])]
+
+queryIncrementVV :: IO Version
+queryIncrementVV = do
+    g <- myID
+    let vs = map snd initial
+        f xs = foldl' max 0 xs + 1
+        v' = accumArray f 0 (range (0, length vs - 1)) . map (map f) $ vs
+    return $ v' // [(g, v' ! g + 1)]
+
+updateAssign :: [X] -> IO Payload
+updateAssign set_r = do
+    v <- queryIncrementVV
+    return $ map (,v) set_r ++ initial
+
+queryValue :: Payload
+queryValue = initial
+
+compare :: Payload -> Payload -> Bool
+compare a b = any (\(x, v) -> any (\(x', v') -> any (< v) v') b) a
+
+merge :: Payload -> Payload -> Payload
+merge a b =
+    let a' = filter (\(x, v) -> any (\(y, w) -> any (>= v ! (length v - 1)) w || any (< w) v) b) a
+        b' = filter (\(y, w) -> any (\(x, v) -> any (>= w ! (length w - 1)) v || any (< v) w) a) b
+    in nub $ a' ++ b'
