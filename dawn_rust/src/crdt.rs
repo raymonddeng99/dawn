@@ -298,3 +298,119 @@ impl OpBasedLWWRegister {
         self.apply_pending();
     }
 }
+
+
+
+// State-based multi-value register
+pub struct MVRegisterValue<X> {
+    x: X,
+    v: Vec<i64>,
+}
+
+impl<X: Clone> MVRegisterValue<X> {
+    fn new(x: X, v: Vec<i64>) -> Self {
+        MVRegisterValue { x, v }
+    }
+}
+
+pub struct MVRegister<X> {
+    payload: Vec<MVRegisterValue<X>>,
+}
+
+impl<X: Clone + Eq + std::hash::Hash> MVRegister<X> {
+    pub fn initial() -> Self {
+        MVRegister {
+            payload: vec![MVRegisterValue::new(X::default(), Vec::new())],
+        }
+    }
+
+    pub fn query_increment_vv(&self, process_id: usize) -> Vec<i64> {
+        let mut max_version = self
+            .payload
+            .iter()
+            .map(|entry| entry.v.iter().copied().max().unwrap_or(0))
+            .max()
+            .unwrap_or(0);
+
+        let mut new_version = self
+            .payload
+            .get(process_id)
+            .map(|entry| entry.v.clone())
+            .unwrap_or_else(|| vec![0; self.payload.len()]);
+
+        new_version[process_id] += 1;
+        max_version = std::cmp::max(max_version, new_version[process_id]);
+
+        for i in 0..new_version.len() {
+            new_version[i] = std::cmp::max(new_version[i], max_version);
+        }
+
+        new_version
+    }
+
+    pub fn update_assign(&mut self, set_r: &[X], process_id: usize) {
+        let new_version = self.query_increment_vv(process_id);
+        self.payload.extend(set_r.iter().map(|&x| {
+            MVRegisterValue::new(x.clone(), new_version.clone())
+        }));
+    }
+
+    pub fn query_value(&self) -> &Vec<MVRegisterValue<X>> {
+        &self.payload
+    }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        self.payload.iter().any(|entry| {
+            other.payload.iter().any(|other_entry| {
+                entry.x == other_entry.x
+                    && entry
+                        .v
+                        .iter()
+                        .any(|&v_entry| other_entry.v.iter().all(|&v_other| v_entry > v_other))
+            })
+        })
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        let mut merged = std::collections::HashSet::new();
+
+        for entry in &self.payload {
+            if other.payload.iter().any(|other_entry| {
+                entry.x == other_entry.x
+                    && (other_entry
+                        .v
+                        .iter()
+                        .any(|&w_entry| w_entry >= *entry.v.last().unwrap_or(&0))
+                        || entry
+                            .v
+                            .iter()
+                            .any(|&v_entry| other_entry.v.iter().all(|&w_entry| v_entry > w_entry)))
+            }) {
+                merged.insert(MVRegisterValue::new(entry.x.clone(), entry.v.clone()));
+            }
+        }
+
+        for other_entry in &other.payload {
+            if self.payload.iter().any(|entry| {
+                other_entry.x == entry.x
+                    && (entry
+                        .v
+                        .iter()
+                        .any(|&v_entry| v_entry >= *other_entry.v.last().unwrap_or(&0))
+                        || other_entry
+                            .v
+                            .iter()
+                            .any(|&w_entry| entry.v.iter().any(|&v_entry| w_entry < v_entry)))
+            }) {
+                merged.insert(MVRegisterValue::new(
+                    other_entry.x.clone(),
+                    other_entry.v.clone(),
+                ));
+            }
+        }
+
+        MVRegister {
+            payload: merged.into_iter().collect(),
+        }
+    }
+}
