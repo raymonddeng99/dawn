@@ -211,3 +211,53 @@ downstream ref = do
   reg <- readIORef ref
   writeIORef ref (applyPending reg)
   readIORef ref
+
+
+-- State-based multi-value register
+module MVRegister
+
+public export
+data X = MkX Int
+
+public export
+Version : Type
+Version = List Int
+
+public export
+Payload : Type
+Payload = List (X, Version)
+
+export
+initial : Payload
+initial = [(MkX (-1), [])]
+
+export
+queryIncrementVV : (Int -> IO Int) -> Payload -> IO Version
+queryIncrementVV myID payload = do
+  g <- myID
+  let vs = map snd payload
+      maxVersion = foldr max 0 $ concatMap id vs
+  let newVersion = replicate (length payload) (maxVersion + 1)
+  pure $ updateAt g (+ 1) newVersion
+
+export
+updateAssign : (Int -> IO Int) -> List X -> Payload -> IO Payload
+updateAssign myID set_r payload = do
+  g <- myID
+  newVersion <- queryIncrementVV myID payload
+  pure $ map (\x => (x, newVersion)) set_r ++ payload
+
+export
+queryValue : Payload -> Payload
+queryValue = id
+
+export
+compare : Payload -> Payload -> Bool
+compare a b = any (\(x, v) => any (\(x', v') => any (> v') v) (filter (\(x'', _) => x == x'') b)) a
+
+export
+merge : Payload -> Payload -> Payload
+merge a b =
+  let a' = filter (\(x, v) => any (\(y, w) => (last w >= last v) || any (< w) v) b) a
+      b' = filter (\(y, w) => any (\(x, v) => (last v >= last w) || any (< v) w) a) b
+  in nubBy (\(x, _), (y, _) => x == y) (a' ++ b')
