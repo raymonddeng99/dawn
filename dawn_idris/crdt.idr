@@ -261,3 +261,24 @@ merge a b =
   let a' = filter (\(x, v) => any (\(y, w) => (last w >= last v) || any (< w) v) b) a
       b' = filter (\(y, w) => any (\(x, v) => (last v >= last w) || any (< v) w) a) b
   in nubBy (\(x, _), (y, _) => x == y) (a' ++ b')
+
+
+-- State-based grow-only set
+module GSet (P : Type) where
+
+data GSet P = GSet { data : Set P }
+
+empty : GSet P
+empty = GSet mempty
+
+add : GSet P -> P -> GSet P
+add s e = GSet { data = data s `Set.insert` e }
+
+lookup : GSet P -> P -> Bool
+lookup s e = Set.member e (data s)
+
+compare : GSet P -> GSet P -> Bool
+compare s1 s2 = data s1 == data s2
+
+merge : GSet P -> GSet P -> GSet P
+merge s1 s2 = GSet { data = Set.union (data s1) (data s2) }
