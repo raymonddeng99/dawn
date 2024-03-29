@@ -9,6 +9,7 @@ Op-based require delivery order exists and concurrent updates commute
 
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::collections::HashSet;
 
 enum Operation {
     Increment,
@@ -412,5 +413,36 @@ impl<X: Clone + Eq + std::hash::Hash> MVRegister<X> {
         MVRegister {
             payload: merged.into_iter().collect(),
         }
+    }
+}
+
+
+// State-based grow-only set
+pub struct GSet<T> {
+    data: HashSet<T>,
+}
+
+impl<T> GSet<T> {
+    pub fn new() -> Self {
+        GSet { data: HashSet::new() }
+    }
+
+    pub fn add(&mut self, element: T) {
+        self.data.insert(element);
+    }
+
+    pub fn lookup(&self, element: &T) -> bool {
+        self.data.contains(element)
+    }
+
+    pub fn compare(&self, other: &GSet<T>) -> bool {
+        self.data == other.data
+    }
+
+    pub fn merge(&self, other: &GSet<T>) -> GSet<T> {
+        let mut merged = GSet::new();
+        merged.data.extend(self.data.iter().cloned());
+        merged.data.extend(other.data.iter().cloned());
+        merged
     }
 }
