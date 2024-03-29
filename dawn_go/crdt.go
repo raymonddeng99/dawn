@@ -411,3 +411,45 @@ func anyLessThan(arr []int64, val int64) bool {
     }
     return false
 }
+
+
+// State-based grow-only set
+type GSet[T any] struct {
+    data map[T]struct{}
+}
+
+func NewGSet[T any]() *GSet[T] {
+    return &GSet[T]{data: make(map[T]struct{})}
+}
+
+func (s *GSet[T]) Add(e T) {
+    s.data[e] = struct{}{}
+}
+
+func (s *GSet[T]) Lookup(e T) bool {
+    _, ok := s.data[e]
+    return ok
+}
+
+func (s *GSet[T]) Compare(other *GSet[T]) bool {
+    if len(s.data) != len(other.data) {
+        return false
+    }
+    for k := range s.data {
+        if _, ok := other.data[k]; !ok {
+            return false
+        }
+    }
+    return true
+}
+
+func (s *GSet[T]) Merge(other *GSet[T]) *GSet[T] {
+    merged := NewGSet[T]()
+    for k := range s.data {
+        merged.Add(k)
+    }
+    for k := range other.data {
+        merged.Add(k)
+    }
+    return merged
+}
