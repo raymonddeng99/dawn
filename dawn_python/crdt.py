@@ -8,7 +8,7 @@ Op-based require delivery order exists and concurrent updates commute
 '''
 
 from enum import Enum
-from typing import List, Tuple
+from typing import List, Tuple, TypeVar, Generic
 from threading import Lock
 
 class Operation(Enum):
@@ -245,3 +245,25 @@ class MVRegister:
                 ):
                     merged.add((y, tuple(w)))
             return [MVRegisterValue(x, list(v)) for x, v in merged]
+
+
+# State-based grow-only set
+T = TypeVar('T')
+class GSet(Generic[T]):
+  def __init__(self):
+    self.data = set()
+
+  def add(self, element: T) -> None:
+    self.data.add(element)
+
+  def lookup(self, element: T) -> bool:
+    return element in self.data
+
+  def compare(self, other: GSet[T]) -> bool:
+    return self.data == other.data
+
+  def merge(self, other: GSet[T]) -> GSet[T]:
+    merged_set = GSet()
+    merged_set.data.update(self.data)
+    merged_set.data.update(other.data)
+    return merged_set
