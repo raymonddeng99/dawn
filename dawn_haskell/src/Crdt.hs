@@ -241,3 +241,24 @@ merge a b =
     let a' = filter (\(x, v) -> any (\(y, w) -> any (>= v ! (length v - 1)) w || any (< w) v) b) a
         b' = filter (\(y, w) -> any (\(x, v) -> any (>= w ! (length w - 1)) v || any (< v) w) a) b
     in nub $ a' ++ b'
+
+
+-- State-based grow-only set
+module GSet (P) where
+
+data GSet P = GSet { data :: Set (P.t) }
+
+empty :: GSet P
+empty = GSet mempty
+
+add :: GSet P -> P.t -> GSet P
+add s e = s { data = data s `Set.insert` e }
+
+lookup :: GSet P -> P.t -> Bool
+lookup s e = Set.member e (data s)
+
+compare :: GSet P -> GSet P -> Bool
+compare s1 s2 = data s1 == data s2
+
+merge :: GSet P -> GSet P -> GSet P
+merge s1 s2 = GSet $ Set.union (data s1) (data s2)
