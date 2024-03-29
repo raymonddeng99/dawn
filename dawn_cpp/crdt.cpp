@@ -15,6 +15,7 @@ Op-based require delivery order exists and concurrent updates commute
 #include <atomic>
 #include <utility>
 #include <mutex>
+#include <unordered_set>
 
 enum class Operation { Increment, Decrement };
 
@@ -357,4 +358,34 @@ public:
 
         return merged;
     }
+};
+
+
+// State-based grow-only set
+template <typename T>
+class GSet {
+public:
+  GSet() : data(std::unordered_set<T>()) {}
+
+  void add(const T& element) {
+    data.insert(element);
+  }
+
+  bool lookup(const T& element) const {
+    return data.count(element) > 0;
+  }
+
+  bool compare(const GSet<T>& other) const {
+    return data == other.data;
+  }
+
+  GSet<T> merge(const GSet<T>& other) const {
+    GSet<T> merged;
+    merged.data.insert(data.begin(), data.end());
+    merged.data.insert(other.data.begin(), other.data.end());
+    return merged;
+  }
+
+private:
+  std::unordered_set<T> data;
 };
