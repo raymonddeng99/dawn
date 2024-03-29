@@ -237,3 +237,19 @@ module MVRegister = struct
     ) b in
     a' @ b'
 end
+
+(* State-based grow-only set *)
+module GSet = struct
+  type t = {
+    mutable data : P.t set
+  }
+  let empty () = { data = Set.empty }
+
+  let add (s : t) (e : P.t) = s.data <- Set.add e s.data
+
+  let lookup (s : t) (e : P.t) = Set.mem e s.data
+
+  let compare (s1 : t) (s2 : t) = s1.data = s2.data
+  
+  let merge (s1 : t) (s2 : t) = { data = Set.union s1.data s2.data }
+end
