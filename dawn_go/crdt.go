@@ -453,3 +453,65 @@ func (s *GSet[T]) Merge(other *GSet[T]) *GSet[T] {
     }
     return merged
 }
+
+// State-based 2P set
+type StateBased2PSet[T comparable] struct {
+    added   map[T]bool
+    removed map[T]bool
+}
+
+func NewStateBased2PSet[T comparable]() *StateBased2PSet[T] {
+    return &StateBased2PSet[T]{
+        added:   make(map[T]bool),
+        removed: make(map[T]bool),
+    }
+}
+
+func (s *StateBased2PSet[T]) Lookup(e T) bool {
+    _, inAdded := s.added[e]
+    _, inRemoved := s.removed[e]
+    return inAdded && !inRemoved
+}
+
+func (s *StateBased2PSet[T]) Add(e T) {
+    if !s.Lookup(e) {
+        s.added[e] = true
+    }
+}
+
+func (s *StateBased2PSet[T]) Remove(e T) {
+    if s.Lookup(e) {
+        s.removed[e] = true
+    }
+}
+
+func (s *StateBased2PSet[T]) Compare(other *StateBased2PSet[T]) bool {
+    for k := range s.added {
+        if !other.Lookup(k) {
+            return false
+        }
+    }
+    for k := range s.removed {
+        if !other.Lookup(k) {
+            return false
+        }
+    }
+    return true
+}
+
+func (s *StateBased2PSet[T]) Merge(other *StateBased2PSet[T]) *StateBased2PSet[T] {
+    merged := NewStateBased2PSet[T]()
+    for k := range s.added {
+        merged.added[k] = true
+    }
+    for k := range other.added {
+        merged.added[k] = true
+    }
+    for k := range s.removed {
+        merged.removed[k] = true
+    }
+    for k := range other.removed {
+        merged.removed[k] = true
+    }
+    return merged
+}
