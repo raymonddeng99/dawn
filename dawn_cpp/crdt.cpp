@@ -389,3 +389,49 @@ public:
 private:
   std::unordered_set<T> data;
 };
+
+
+// State-based 2P set
+template <typename T>
+class StateBased2PSet {
+private:
+    std::set<T> added;
+    std::set<T> removed;
+
+public:
+    StateBased2PSet() = default;
+
+    bool lookup(const T& e) const {
+        return (added.count(e) > 0) && (removed.count(e) == 0);
+    }
+
+    void add(const T& e) {
+        if (!lookup(e)) {
+            added.insert(e);
+        }
+    }
+
+    void remove(const T& e) {
+        if (lookup(e)) {
+            removed.insert(e);
+        }
+    }
+
+    bool compare(const StateBased2PSet& other) const {
+        std::set<T> temp_added, temp_removed;
+        std::set_intersection(added.begin(), added.end(), other.added.begin(), other.added.end(),
+                              std::inserter(temp_added, temp_added.begin()));
+        std::set_intersection(removed.begin(), removed.end(), other.removed.begin(), other.removed.end(),
+                              std::inserter(temp_removed, temp_removed.begin()));
+        return (temp_added == added) && (temp_removed == removed);
+    }
+
+    StateBased2PSet merge(const StateBased2PSet& other) const {
+        StateBased2PSet<T> merged;
+        std::set_union(added.begin(), added.end(), other.added.begin(), other.added.end(),
+                       std::inserter(merged.added, merged.added.begin()));
+        std::set_union(removed.begin(), removed.end(), other.removed.begin(), other.removed.end(),
+                       std::inserter(merged.removed, merged.removed.begin()));
+        return merged;
+    }
+};
