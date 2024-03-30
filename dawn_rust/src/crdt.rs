@@ -446,3 +446,51 @@ impl<T> GSet<T> {
         merged
     }
 }
+
+// State-based 2P set
+pub struct StateBased2PSet<T>
+where
+    T: Eq + std::hash::Hash,
+{
+    added: HashSet<T>,
+    removed: HashSet<T>,
+}
+
+impl<T> StateBased2PSet<T>
+where
+    T: Eq + std::hash::Hash + Clone,
+{
+    pub fn new() -> Self {
+        Self {
+            added: HashSet::new(),
+            removed: HashSet::new(),
+        }
+    }
+
+    pub fn lookup(&self, e: &T) -> bool {
+        self.added.contains(e) && !self.removed.contains(e)
+    }
+
+    pub fn add(&mut self, e: T) {
+        if !self.lookup(&e) {
+            self.added.insert(e);
+        }
+    }
+
+    pub fn remove(&mut self, e: &T) {
+        if self.lookup(e) {
+            self.removed.insert(e.clone());
+        }
+    }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        self.added.is_subset(&other.added) && self.removed.is_subset(&other.removed)
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        let mut merged = Self::new();
+        merged.added = self.added.union(&other.added).cloned().collect();
+        merged.removed = self.removed.union(&other.removed).cloned().collect();
+        merged
+    }
+}
