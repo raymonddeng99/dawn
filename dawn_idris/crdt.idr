@@ -8,6 +8,7 @@
 -}
 
 import Data.Vect
+import Data.SortedSet
 
 data Operation = Increment | Decrement
 
@@ -282,3 +283,44 @@ compare s1 s2 = data s1 == data s2
 
 merge : GSet P -> GSet P -> GSet P
 merge s1 s2 = GSet { data = Set.union (data s1) (data s2) }
+
+
+module StateBased2PSet
+
+public export
+record StateBased2PSet a where
+  constructor MkSet
+  added : SortedSet a
+  removed : SortedSet a
+
+public export
+empty : StateBased2PSet a
+empty = MkSet empty empty
+
+public export
+lookup : Ord a => StateBased2PSet a -> a -> Bool
+lookup (MkSet added removed) e = elem e added && not (elem e removed)
+
+public export
+add : Ord a => StateBased2PSet a -> a -> StateBased2PSet a
+add (MkSet added removed) e =
+  if lookup (MkSet added removed) e
+    then MkSet added removed
+    else MkSet (insert e added) removed
+
+public export
+remove : Ord a => StateBased2PSet a -> a -> StateBased2PSet a
+remove (MkSet added removed) e =
+  if lookup (MkSet added removed) e
+    then MkSet added (insert e removed)
+    else MkSet added removed
+
+public export
+compare : Ord a => StateBased2PSet a -> StateBased2PSet a -> Bool
+compare (MkSet a1 r1) (MkSet a2 r2) =
+  isSubsetOf a1 a2 && isSubsetOf r1 r2
+
+public export
+merge : Ord a => StateBased2PSet a -> StateBased2PSet a -> StateBased2PSet a
+merge (MkSet a1 r1) (MkSet a2 r2) =
+  MkSet (union a1 a2) (union r1 r2)
