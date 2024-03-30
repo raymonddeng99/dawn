@@ -253,3 +253,42 @@ module GSet = struct
   
   let merge (s1 : t) (s2 : t) = { data = Set.union s1.data s2.data }
 end
+
+
+(* State-based 2P set *)
+module StateBased2PSet = struct
+  type t = {
+    a : int list;
+    r : int list;
+  }
+
+  let empty = { a = []; r = [] }
+
+  let lookup set e =
+    List.mem e set.a && not (List.mem e set.r)
+
+  let add set e =
+    if not (lookup set e) then
+      { set with a = e :: set.a }
+    else
+      set
+
+  let remove set e =
+    if lookup set e then
+      { set with r = e :: set.r }
+    else
+      set
+
+  let compare set1 set2 =
+    let subset xs ys =
+      List.for_all (fun x -> List.mem x ys) xs
+    in
+    subset set1.a set2.a && subset set1.r set2.r
+
+  let merge set1 set2 =
+    let union xs ys =
+      List.rev_append (List.rev_append xs (List.rev ys)) []
+    in
+    { a = union set1.a set2.a;
+      r = union set1.r set2.r; }
+end
