@@ -11,6 +11,7 @@ Op-based require delivery order exists and concurrent updates commute
 import Data.List (foldl', nub)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
 import Data.Array (Array, (!), (//), accumArray, elems, listArray, range)
+import Data.Set (Set)
 
 data Operation = Increment | Decrement deriving (Show, Eq)
 
@@ -262,3 +263,39 @@ compare s1 s2 = data s1 == data s2
 
 merge :: GSet P -> GSet P -> GSet P
 merge s1 s2 = GSet $ Set.union (data s1) (data s2)
+
+
+-- State-based 2P set
+module StateBased2PSet(
+  StateBased2PSet,
+  empty,
+  lookup,
+  add,
+  remove,
+  compare,
+  merge
+) where
+
+data StateBased2PSet a = S2PSet { added :: Set.Set a, removed :: Set.Set a }
+
+empty :: StateBased2PSet a
+empty = S2PSet Set.empty Set.empty
+
+lookup :: Ord a => StateBased2PSet a -> a -> Bool
+lookup (S2PSet a r) e = Set.member e a && not (Set.member e r)
+
+add :: Ord a => StateBased2PSet a -> a -> StateBased2PSet a
+add (S2PSet a r) e = S2PSet (Set.insert e a) r
+
+remove :: Ord a => StateBased2PSet a -> a -> StateBased2PSet a
+remove (S2PSet a r) e
+  | lookup (S2PSet a r) e = S2PSet a (Set.insert e r)
+  | otherwise = S2PSet a r
+
+compare :: Ord a => StateBased2PSet a -> StateBased2PSet a -> Bool
+compare (S2PSet a1 r1) (S2PSet a2 r2) =
+  Set.isSubsetOf a1 a2 && Set.isSubsetOf r1 r2
+
+merge :: Ord a => StateBased2PSet a -> StateBased2PSet a -> StateBased2PSet a
+merge (S2PSet a1 r1) (S2PSet a2 r2) =
+  S2PSet (Set.union a1 a2) (Set.union r1 r2)
