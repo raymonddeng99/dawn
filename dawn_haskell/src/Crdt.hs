@@ -299,3 +299,35 @@ compare (S2PSet a1 r1) (S2PSet a2 r2) =
 merge :: Ord a => StateBased2PSet a -> StateBased2PSet a -> StateBased2PSet a
 merge (S2PSet a1 r1) (S2PSet a2 r2) =
   S2PSet (Set.union a1 a2) (Set.union r1 r2)
+
+
+
+-- Op based 2p set with unique elements
+module USet (
+    USet,
+    emptyUSet,
+    lookup,
+    add,
+    remove
+) where
+
+type Element = Int
+
+newtype USet = USet (Set.Set Element)
+  deriving (Eq, Show)
+
+emptyUSet :: USet
+emptyUSet = USet Set.empty
+
+lookup :: Element -> USet -> Bool
+lookup e (USet s) = Set.member e s
+
+add :: Element -> USet -> USet
+add e (USet s)
+  | lookup e (USet s) = USet s
+  | otherwise = USet (Set.insert e s)
+
+remove :: Element -> USet -> USet
+remove e (USet s)
+  | lookup e (USet s) = USet (Set.delete e s)
+  | otherwise = USet s
