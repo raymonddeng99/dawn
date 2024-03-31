@@ -292,3 +292,26 @@ module StateBased2PSet = struct
     { a = union set1.a set2.a;
       r = union set1.r set2.r; }
 end
+
+(* Op based 2p set with unique elements *)
+module USet = struct
+  type element = int
+
+  module IntSet = Set.Make(Int))
+  let payload_set = ref IntSet.empty
+
+  let lookup e =
+    IntSet.mem e !payload_set
+
+  let add e =
+    if not (lookup e) then (
+      payload_set := IntSet.add e !payload_set;
+      true
+    ) else false
+
+  let remove e =
+    if lookup e then (
+      payload_set := IntSet.remove e !payload_set;
+      true
+    ) else false
+end
