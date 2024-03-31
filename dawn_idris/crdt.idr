@@ -324,3 +324,25 @@ public export
 merge : Ord a => StateBased2PSet a -> StateBased2PSet a -> StateBased2PSet a
 merge (MkSet a1 r1) (MkSet a2 r2) =
   MkSet (union a1 a2) (union r1 r2)
+
+
+-- Op based 2p set with unique elements
+module USet
+
+Element : Type
+Element = Int
+
+USet : Type
+USet = Vect Element
+
+emptyUSet : USet
+emptyUSet = []
+
+lookup : (e : Element) -> (uset : USet) -> Bool
+lookup e uset = elem e uset
+
+add : (e : Element) -> (uset : USet) -> USet
+add e uset = if lookup e uset then uset else e :: uset
+
+remove : (e : Element) -> (uset : USet) -> USet
+remove e uset = filter (/= e) uset
