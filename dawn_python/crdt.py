@@ -293,3 +293,29 @@ class StateBased2PSet:
         U.A = self.A.union(other.A)
         U.R = self.R.union(other.R)
         return U
+
+
+# Op based 2P set with unique elements
+class StateBased2PSet:
+    def __init__(self):
+        self.A = set()
+        self.R = set()
+
+    def lookup(self, e):
+        return e in self.A and e not in self.R
+
+    def add(self, e):
+        self.A.add(e)
+
+    def remove(self, e):
+        if self.lookup(e):
+            self.R.add(e)
+
+    def compare(self, other):
+        return self.A.issubset(other.A) and self.R.issubset(other.R)
+
+    def merge(self, other):
+        U = StateBased2PSet()
+        U.A = self.A.union(other.A)
+        U.R = self.R.union(other.R)
+        return U
