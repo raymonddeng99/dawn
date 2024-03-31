@@ -10,6 +10,7 @@ Op-based require delivery order exists and concurrent updates commute
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::collections::HashSet;
+use std::hash::Hash;
 
 enum Operation {
     Increment,
@@ -491,6 +492,45 @@ where
         let mut merged = Self::new();
         merged.added = self.added.union(&other.added).cloned().collect();
         merged.removed = self.removed.union(&other.removed).cloned().collect();
+        merged
+    }
+}
+
+
+// Op based 2p set with unique elements
+pub struct USet<T>
+where
+    T: Eq + Hash,
+{
+    data: HashSet<T>,
+}
+
+impl<T> USet<T>
+where
+    T: Eq + Hash,
+{
+    pub fn new() -> Self {
+        USet {
+            data: HashSet::new(),
+        }
+    }
+
+    pub fn add(&mut self, element: T) {
+        self.data.insert(element);
+    }
+
+    pub fn lookup(&self, element: &T) -> bool {
+        self.data.contains(element)
+    }
+
+    pub fn compare(&self, other: &USet<T>) -> bool {
+        self.data == other.data
+    }
+
+    pub fn merge(&self, other: &USet<T>) -> USet<T> {
+        let mut merged = USet::new();
+        merged.data.extend(self.data.iter().cloned());
+        merged.data.extend(other.data.iter().cloned());
         merged
     }
 }
