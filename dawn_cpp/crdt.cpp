@@ -435,3 +435,46 @@ public:
         return merged;
     }
 };
+
+
+// Op based 2p set with unique elements
+template <typename T>
+class USet {
+public:
+    USet(const std::vector<T>& p, const std::vector<T>& q) : p(p), n(q) {}
+
+    static USet initialize(int size, const std::vector<T>& p, const std::vector<T>& q) {
+        return USet(p, q);
+    }
+
+    void add(const T& element) {
+        p.push_back(element);
+    }
+
+    bool lookup(const T& element) const {
+        return std::find(p.begin(), p.end(), element) != p.end() &&
+               std::find(n.begin(), n.end(), element) == n.end();
+    }
+
+    void remove(const T& element) {
+        if (lookup(element)) {
+            n.push_back(element);
+        }
+    }
+
+    bool compare(const USet& other) const {
+        return std::is_permutation(p.begin(), p.end(), other.p.begin(), other.p.end()) &&
+               std::is_permutation(n.begin(), n.end(), other.n.begin(), other.n.end());
+    }
+
+    USet merge(const USet& other) const {
+        std::vector<T> merged_p(p), merged_n(n);
+        merged_p.insert(merged_p.end(), other.p.begin(), other.p.end());
+        merged_n.insert(merged_n.end(), other.n.begin(), other.n.end());
+        return USet(merged_p, merged_n);
+    }
+
+private:
+    std::vector<T> p;
+    std::vector<T> n;
+};
