@@ -11,6 +11,7 @@ use std::cmp::Ordering;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::collections::HashMap;
 
 enum Operation {
     Increment,
@@ -532,5 +533,49 @@ where
         merged.data.extend(self.data.iter().cloned());
         merged.data.extend(other.data.iter().cloned());
         merged
+    }
+}
+
+
+// Molli, Weiss, Skaf set
+pub struct MWSSet<T>
+where
+    T: Eq + Hash + Copy,
+{
+    data: HashMap<T, i32>,
+}
+
+impl<T> MWSSet<T>
+where
+    T: Eq + Hash + Copy,
+{
+    pub fn new() -> Self {
+        MWSSet {
+            data: HashMap::new(),
+        }
+    }
+
+    pub fn lookup(&self, e: &T) -> bool {
+        match self.data.get(e) {
+            Some(k) => *k > 0,
+            None => false,
+        }
+    }
+
+    pub fn add(&mut self, e: T) {
+        let j = match self.data.get(&e) {
+            Some(k) if *k < 0 => (-*k) as i32 + 1,
+            _ => 1,
+        };
+        self.data.insert(e, j);
+    }
+
+    pub fn remove(&mut self, e: &T) {
+        if let Some(k) = self.data.get_mut(e) {
+            if *k > 0 {
+                *k -= 1;
+            }
+        }
+        self.data.retain(|_, k| *k != 0);
     }
 }
