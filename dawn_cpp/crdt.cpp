@@ -16,6 +16,7 @@ Op-based require delivery order exists and concurrent updates commute
 #include <utility>
 #include <mutex>
 #include <unordered_set>
+#include <unordered_map>
 
 enum class Operation { Increment, Decrement };
 
@@ -477,4 +478,41 @@ public:
 private:
     std::vector<T> p;
     std::vector<T> n;
+};
+
+
+// Molli, Weiss, Skaf set
+template <typename T>
+class MWSSet {
+private:
+    std::unordered_map<T, int> data;
+
+public:
+    MWSSet() {}
+
+    bool lookup(const T& e) const {
+        auto it = data.find(e);
+        return it != data.end() && it->second > 0;
+    }
+
+    void add(const T& e) {
+        auto it = data.find(e);
+        int j;
+        if (it != data.end() && it->second < 0) {
+            j = -it->second + 1;
+        } else {
+            j = 1;
+        }
+        data[e] = j;
+    }
+
+    void remove(const T& e) {
+        auto it = data.find(e);
+        if (it != data.end() && it->second > 0) {
+            data[e] = it->second - 1;
+            if (data[e] == 0) {
+                data.erase(it);
+            }
+        }
+    }
 };
