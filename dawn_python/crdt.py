@@ -319,3 +319,24 @@ class StateBased2PSet:
         U.A = self.A.union(other.A)
         U.R = self.R.union(other.R)
         return U
+
+
+# Molli, Weiss, Skaf set
+class MWSSet(Generic[T]):
+    def __init__(self):
+        self.data = {}
+
+    def lookup(self, e: T) -> bool:
+        return e in self.data and self.data[e] > 0
+
+    def add(self, e: T):
+        if e in self.data and self.data[e] < 0:
+            self.data[e] = -self.data[e] + 1
+        else:
+            self.data[e] = 1
+
+    def remove(self, e: T):
+        if self.lookup(e):
+            self.data[e] -= 1
+            if self.data[e] == 0:
+                del self.data[e]
