@@ -579,3 +579,41 @@ func (s *USet[T]) Merge(other *USet[T]) *USet[T] {
     }
     return merged
 }
+
+
+// Molli, Weiss, Skaf set
+type MWSElement interface{}
+
+type MWSSet map[MWSElement]int
+
+func NewMWSSet() MWSSet {
+    return make(MWSSet)
+}
+
+func (s MWSSet) Lookup(e MWSElement) bool {
+    k, ok := s[e]
+    return ok && k > 0
+}
+
+func (s MWSSet) Add(e MWSElement) MWSSet {
+    k, ok := s[e]
+    j := 1
+    if ok && k < 0 {
+        j = -k + 1
+    }
+    s[e] = j
+    return s
+}
+
+func (s MWSSet) Remove(e MWSElement) MWSSet {
+    k, ok := s[e]
+    if ok && k > 0 {
+        s[e] = k - 1
+    }
+    for k, v := range s {
+        if v == 0 {
+            delete(s, k)
+        }
+    }
+    return s
+}
