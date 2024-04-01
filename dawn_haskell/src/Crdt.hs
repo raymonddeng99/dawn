@@ -12,6 +12,7 @@ import Data.List (foldl', nub)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
 import Data.Array (Array, (!), (//), accumArray, elems, listArray, range)
 import Data.Set (Set)
+import qualified Data.Map as Map
 
 data Operation = Increment | Decrement deriving (Show, Eq)
 
@@ -331,3 +332,37 @@ remove :: Element -> USet -> USet
 remove e (USet s)
   | lookup e (USet s) = USet (Set.delete e s)
   | otherwise = USet s
+
+
+-- Molli, Weiss, Skaf set
+module MWSSet (
+    MWSSet,
+    emptyMWSSet,
+    lookup,
+    add,
+    remove
+) where
+
+type Element = Int
+type MWSSet = Map.Map Element Int
+
+emptyMWSSet :: MWSSet
+emptyMWSSet = Map.empty
+
+lookup :: Element -> MWSSet -> Bool
+lookup e s = case Map.lookup e s of
+    Just k -> k > 0
+    Nothing -> False
+
+add :: Element -> MWSSet -> MWSSet
+add e s =
+    let j = case Map.lookup e s of
+                Just k | k < 0 -> abs k + 1
+                _ -> 1
+    in Map.insert e j s
+
+remove :: Element -> MWSSet -> MWSSet
+remove e s =
+    case Map.lookup e s of
+        Just k' -> Map.insert e (k' - 1) (Map.delete e s)
+        Nothing -> s
