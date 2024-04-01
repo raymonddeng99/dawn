@@ -9,6 +9,7 @@
 
 import Data.Vect
 import Data.SortedSet
+import Data.SortedMap
 
 data Operation = Increment | Decrement
 
@@ -346,3 +347,32 @@ add e uset = if lookup e uset then uset else e :: uset
 
 remove : (e : Element) -> (uset : USet) -> USet
 remove e uset = filter (/= e) uset
+
+
+-- Molli, Weiss, Skaf set
+MWSSet : Type -> Type
+MWSSet a = SortedMap a Int
+
+emptyMWSSet : Ord a => MWSSet a
+emptyMWSSet = empty
+
+lookup : Ord a => a -> MWSSet a -> Bool
+lookup e s = case lookup e s of
+                Just k => k > 0
+                Nothing => False
+
+add : Ord a => a -> MWSSet a -> MWSSet a
+add e s =
+    let j = case lookup e s of
+                Just k | k < 0 => abs k + 1
+                _ => 1
+    in insert e j s
+
+remove : Ord a => a -> MWSSet a -> MWSSet a
+remove e s =
+    case lookup e s of
+        Just k' => let s' = delete e s in
+                       if k' > 1
+                          then insert e (k' - 1) s'
+                          else s'
+        Nothing => s
