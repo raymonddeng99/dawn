@@ -315,3 +315,33 @@ module USet = struct
       true
     ) else false
 end
+
+(* Molli, Weiss, Skaf set *)
+module MWSSet = struct
+  type element = int
+  type mwsset = (element * int) list
+
+  let initial_set = []
+
+  let lookup (e : element) (s : mwsset) =
+    List.exists (fun (x, k) -> x = e && k > 0) s
+
+  let add (e : element) (s : mwsset) =
+    let j =
+      try
+        let (_, k) = List.find (fun (x, _) -> x = e) s in
+        if k < 0 then abs k + 1 else 1
+      with Not_found -> 1
+    in
+    List.remove_assocs e s @ [(e, j)]
+
+  let remove (e : element) (s : mwsset) =
+    let s' =
+      if lookup e s then
+        let (_, k') = List.find (fun (x, _) -> x = e) s in
+        List.remove_assocs e s @ [(e, k' - 1)]
+      else
+        s
+    in
+    List.filter (fun (_, k) -> k <> 0) s'
+end
