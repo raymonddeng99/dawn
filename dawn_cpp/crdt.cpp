@@ -516,3 +516,32 @@ public:
         }
     }
 };
+
+
+// Operation based observed-remove set
+
+template <typename T>
+class ORSet {
+private:
+    std::unordered_set<T> added;
+    std::unordered_set<T> removed;
+
+public:
+    ORSet() {}
+
+    bool lookup(const T& e) const {
+        return added.count(e) && !removed.count(e);
+    }
+
+    void add(const T& e) {
+        if (!lookup(e)) {
+            added.insert(e);
+        }
+    }
+
+    void remove(const T& e) {
+        if (lookup(e)) {
+            removed.insert(e);
+        }
+    }
+};
