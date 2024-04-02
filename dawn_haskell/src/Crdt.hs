@@ -366,3 +366,54 @@ remove e s =
     case Map.lookup e s of
         Just k' -> Map.insert e (k' - 1) (Map.delete e s)
         Nothing -> s
+
+
+-- Operation based observed-remove set
+module ORSet (
+  UniqueTag,
+  Elem,
+  Set,
+  uniqueTag,
+  uniqueElements,
+  emptySet,
+  addORSet,
+  lookupORSet,
+  removeORSet,
+  downstreamORSet,
+  preConditionORSet,
+  atSourceORSet
+) where
+
+type UniqueTag = ()
+type Elem = (Int, UniqueTag)
+type Set = [Elem]
+
+uniqueTag :: UniqueTag
+uniqueTag = ()
+
+uniqueElements :: Set -> Set
+uniqueElements = unique
+  where
+    unique [] = []
+    unique (x:xs) = x : unique (filter (/= x) xs)
+
+emptySet :: Set
+emptySet = []
+
+addORSet :: Int -> Set -> Set
+addORSet e set = uniqueElements ((e, uniqueTag) : set)
+
+lookupORSet :: Int -> Set -> Bool
+lookupORSet e = any (\(x, _) -> x == e)
+
+removeORSet :: Int -> Set -> Set
+removeORSet e = filter (\(x, _) -> x /= e)
+
+downstreamORSet :: Set -> Set
+downstreamORSet = id
+
+preConditionORSet :: (Set -> Set) -> Set -> Set
+preConditionORSet f = f
+
+atSourceORSet :: Int -> Int
+atSourceORSet = id
