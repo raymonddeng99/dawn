@@ -345,3 +345,38 @@ module MWSSet = struct
     in
     List.filter (fun (_, k) -> k <> 0) s'
 end
+
+
+(* Operation based observed-remove set *)
+module ORSet = struct
+  type unique_tag = unit
+
+  type elem = int * unique_tag
+  type set = (elem) list
+
+  let unique_tag () = ()
+
+  let rec unique_elements lst =
+    match lst with
+    | [] -> []
+    | x :: xs -> x :: unique_elements (List.filter (fun y -> x <> y) xs)
+
+  let empty_set = []
+
+  let add e set =
+    let new_tag = unique_tag () in
+    let new_elem = (e, new_tag) in
+    unique_elements (new_elem :: set)
+
+  let lookup e set =
+    List.exists (fun (x, _) -> x = e) set
+
+  let remove e set =
+    List.filter (fun (x, _) -> x <> e) set
+
+  let downstream r = r
+
+  let pre_condition f set = f set
+
+  let atSource e = e
+end
