@@ -376,3 +376,43 @@ remove e s =
                           then insert e (k' - 1) s'
                           else s'
         Nothing => s
+
+
+-- Operation based observed-remove set
+module ORSet (P : Type) where
+
+public export
+record ORSet a where
+  constructor MkORSet
+  added    : SortedSet a
+  removed  : SortedSet a
+
+public export
+empty : ORSet a
+empty = MkORSet empty empty
+
+public export
+lookup : Ord a => a -> ORSet a -> Bool
+lookup x (MkORSet added removed) = x `elem` added && not (x `elem` removed)
+
+public export
+add : Ord a => a -> ORSet a -> ORSet a
+add x (MkORSet added removed) = if lookup x (MkORSet added removed)
+                                   then MkORSet added removed
+                                   else MkORSet (insert x added) removed
+
+public export
+remove : Ord a => a -> ORSet a -> ORSet a
+remove x (MkORSet added removed) = if lookup x (MkORSet added removed)
+                                      then MkORSet added (insert x removed)
+                                      else MkORSet added removed
+
+public export
+compare : Ord a => ORSet a -> ORSet a -> Bool
+compare (MkORSet added1 removed1) (MkORSet added2 removed2) =
+  added1 == added2 && removed1 == removed2
+
+public export
+merge : Ord a => ORSet a -> ORSet a -> ORSet a
+merge (MkORSet added1 removed1) (MkORSet added2 removed2) =
+  MkORSet (union added1 added2) (union removed1 removed2)
