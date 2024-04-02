@@ -340,3 +340,21 @@ class MWSSet(Generic[T]):
             self.data[e] -= 1
             if self.data[e] == 0:
                 del self.data[e]
+
+
+# Operation based observed-remove set
+class ORSet:
+    def __init__(self):
+        self.added = set()
+        self.removed = set()
+
+    def lookup(self, e):
+        return e in self.added and e not in self.removed
+
+    def add(self, e):
+        if not self.lookup(e):
+            self.added.add(e)
+
+    def remove(self, e):
+        if self.lookup(e):
+            self.removed.add(e)
