@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::collections::HashMap;
+use std::cmp::Eq;
 
 enum Operation {
     Increment,
@@ -577,5 +578,37 @@ where
             }
         }
         self.data.retain(|_, k| *k != 0);
+    }
+}
+
+
+// Operation based observed-remove set
+pub struct ORSet<T>
+where
+    T: Eq + Hash + Copy,
+{
+    data: HashMap<T, bool>,
+}
+
+impl<T> ORSet<T>
+where
+    T: Eq + Hash + Copy,
+{
+    pub fn new() -> Self {
+        ORSet {
+            data: HashMap::new(),
+        }
+    }
+
+    pub fn lookup(&self, e: &T) -> bool {
+        self.data.contains_key(e)
+    }
+
+    pub fn add(&mut self, e: T) {
+        self.data.insert(e, true);
+    }
+
+    pub fn remove(&mut self, e: &T) {
+        self.data.remove(e);
     }
 }
