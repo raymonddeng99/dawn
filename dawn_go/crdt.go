@@ -617,3 +617,69 @@ func (s MWSSet) Remove(e MWSElement) MWSSet {
     }
     return s
 }
+
+// Operation based observed-remove set
+type UniqueTagORSet struct{}
+
+type ElemORSet struct {
+    value int
+    tag   UniqueTagORSet
+}
+
+type SetORSet []ElemORSet
+
+func uniqueTagORSet() UniqueTagORSet {
+    return UniqueTagORSet{}
+}
+
+func uniqueElementsORSet(set SetORSet) SetORSet {
+    result := make(SetORSet, 0, len(set))
+    seen := make(map[ElemORSet]bool)
+    for _, elem := range set {
+        if !seen[elem] {
+            seen[elem] = true
+            result = append(result, elem)
+        }
+    }
+    return result
+}
+
+func EmptySetORSet() SetORSet {
+    return make(SetORSet, 0)
+}
+
+func AddORSet(value int, set SetORSet) SetORSet {
+    elem := ElemORSet{value, uniqueTagORSet()}
+    return uniqueElementsORSet(append(set, elem))
+}
+
+func LookupORSet(value int, set SetORSet) bool {
+    for _, elem := range set {
+        if elem.value == value {
+            return true
+        }
+    }
+    return false
+}
+
+func RemoveORSet(value int, set SetORSet) SetORSet {
+    result := make(SetORSet, 0, len(set))
+    for _, elem := range set {
+        if elem.value != value {
+            result = append(result, elem)
+        }
+    }
+    return result
+}
+
+func DownstreamORSet(set SetORSet) SetORSet {
+    return set
+}
+
+func PreConditionORSet(f func(SetORSet) SetORSet, set SetORSet) SetORSet {
+    return f(set)
+}
+
+func AtSourceORSet(value int) int {
+    return value
+}
