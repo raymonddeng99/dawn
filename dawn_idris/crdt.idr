@@ -416,3 +416,24 @@ public export
 merge : Ord a => ORSet a -> ORSet a -> ORSet a
 merge (MkORSet added1 removed1) (MkORSet added2 removed2) =
   MkORSet (union added1 added2) (union removed1 removed2)
+
+
+
+-- Operation based 2P2P graph
+module Graph2P
+
+public export
+Vertex : Type
+Vertex = Int
+
+public export
+Edge : Type
+Edge = (Vertex, Vertex)
+
+public export
+Graph : Type
+Graph = (Vect Vertex, Vect Vertex, Vect Edge, Vect Edge)
+
+public export
+initialGraph : Graph
+initialGraph = ([], [], [], [])
