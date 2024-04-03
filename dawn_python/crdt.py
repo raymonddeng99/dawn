@@ -358,3 +358,12 @@ class ORSet:
     def remove(self, e):
         if self.lookup(e):
             self.removed.add(e)
+
+
+# Operation based 2P2P graph
+Vertex = int
+Edge = Tuple[Vertex, Vertex]
+Graph = Tuple[Set[Vertex], Set[Vertex], Set[Edge], Set[Edge]]
+
+def initial_graph() -> Graph:
+    return set(), set(), set(), set()
