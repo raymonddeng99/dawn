@@ -612,3 +612,26 @@ where
         self.data.remove(e);
     }
 }
+
+
+// Operation based 2P2P graph
+type Vertex = u32;
+type Edge = (Vertex, Vertex);
+
+struct Graph {
+    va: HashSet<Vertex>,
+    vr: HashSet<Vertex>,
+    ea: HashSet<Edge>,
+    er: HashSet<Edge>,
+}
+
+impl Graph {
+    fn new() -> Self {
+        Graph {
+            va: HashSet::new(),
+            vr: HashSet::new(),
+            ea: HashSet::new(),
+            er: HashSet::new(),
+        }
+    }
+}
