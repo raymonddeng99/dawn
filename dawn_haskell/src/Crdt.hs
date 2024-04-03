@@ -417,3 +417,25 @@ preConditionORSet f = f
 
 atSourceORSet :: Int -> Int
 atSourceORSet = id
+
+
+-- Operation based 2P2P graph
+module Graph2P
+  ( Vertex
+  , Edge
+  , Graph
+  , initialGraph
+  , lookupVertex
+  , lookupEdge
+  , addVertex
+  , addEdge
+  , removeVertex
+  , removeEdge
+  ) where
+
+type Vertex = Int
+type Edge = (Vertex, Vertex)
+type Graph = (Set.Set Vertex, Set.Set Vertex, Set.Set Edge, Set.Set Edge)
+
+initialGraph :: Graph
+initialGraph = (Set.empty, Set.empty, Set.empty, Set.empty)
