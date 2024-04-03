@@ -683,3 +683,24 @@ func PreConditionORSet(f func(SetORSet) SetORSet, set SetORSet) SetORSet {
 func AtSourceORSet(value int) int {
     return value
 }
+
+
+// Operation based 2P2P graph
+type Vertex int
+type Edge struct {
+    U, V Vertex
+}
+
+type Graph struct {
+    Va, Vr map[Vertex]struct{}
+    Ea, Er map[Edge]struct{}
+}
+
+func NewGraph() *Graph {
+    return &Graph{
+        Va: make(map[Vertex]struct{}),
+        Vr: make(map[Vertex]struct{}),
+        Ea: make(map[Edge]struct{}),
+        Er: make(map[Edge]struct{}),
+    }
+}
