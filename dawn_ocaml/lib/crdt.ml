@@ -380,3 +380,16 @@ module ORSet = struct
 
   let atSource e = e
 end
+
+(* Operation based 2P2P graph *)
+module Graph2P = struct
+  type vertex = int
+  type edge = vertex * vertex
+  module VSet = Set.Make(Int)
+  module ESet = Set.Make(struct
+    type t = edge
+    let compare (u, v) (x, y) =
+      let c = compare u x in
+      if c <> 0 then c else compare v y
+  end)
+end
