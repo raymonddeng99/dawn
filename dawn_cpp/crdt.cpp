@@ -545,3 +545,17 @@ public:
         }
     }
 };
+
+
+// Operation based 2P2P graph
+using Vertex = int;
+using Edge = std::pair<Vertex, Vertex>;
+
+class TwoPGraph {
+private:
+    std::unordered_set<Vertex> va, vr;
+    std::unordered_set<Edge> ea, er;
+
+public:
+    TwoPGraph() = default;
+};
