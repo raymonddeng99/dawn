@@ -519,7 +519,6 @@ public:
 
 
 // Operation based observed-remove set
-
 template <typename T>
 class ORSet {
 private:
@@ -546,7 +545,6 @@ public:
     }
 };
 
-
 // Operation based 2P2P graph
 using Vertex = int;
 using Edge = std::pair<Vertex, Vertex>;
@@ -558,4 +556,51 @@ private:
 
 public:
     TwoPGraph() = default;
+
+    bool lookup_vertex(Vertex v) const {
+        return va.count(v) && !vr.count(v);
+    }
+
+    bool lookup_edge(const Edge& e) const {
+        Vertex u = e.first, v = e.second;
+        return va.count(u) && va.count(v) && (ea.count(e) || er.count(e));
+    }
+
+    void add_vertex(Vertex v) {
+        va.insert(v);
+    }
+
+    void add_edge(Vertex u, Vertex v) {
+        if (va.count(u) && va.count(v)) {
+            ea.insert(std::make_pair(u, v));
+        }
+    }
+
+    void remove_vertex(Vertex v) {
+        if (va.count(v)) {
+            bool can_remove = true;
+            for (const auto& e : ea) {
+                if (e.first == v || e.second == v) {
+                    can_remove = false;
+                    break;
+                }
+            }
+            for (const auto& e : er) {
+                if (e.first == v || e.second == v) {
+                    can_remove = false;
+                    break;
+                }
+            }
+            if (can_remove) {
+                va.erase(v);
+                vr.insert(v);
+            }
+        }
+    }
+
+    void remove_edge(Vertex u, Vertex v) {
+        if (va.count(u) && va.count(v)) {
+            er.insert(std::make_pair(u, v));
+        }
+    }
 };
