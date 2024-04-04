@@ -634,4 +634,47 @@ impl Graph {
             er: HashSet::new(),
         }
     }
+
+    fn lookup_vertex(&self, v: Vertex) -> bool {
+        self.va.contains(&v) && !self.vr.contains(&v)
+    }
+
+    fn lookup_edge(&self, e: &Edge) -> bool {
+        let (u, v) = *e;
+        self.va.contains(&u)
+            && self.va.contains(&v)
+            && (self.ea.contains(e) || self.er.contains(e))
+    }
+
+    fn add_vertex(&mut self, v: Vertex) {
+        self.va.insert(v);
+    }
+
+    fn add_edge(&mut self, u: Vertex, v: Vertex) {
+        if self.va.contains(&u) && self.va.contains(&v) {
+            self.ea.insert((u, v));
+        }
+    }
+
+    fn remove_vertex(&mut self, v: Vertex) {
+        if self.va.contains(&v) {
+            let mut can_remove = true;
+            for e in self.ea.iter().chain(self.er.iter()) {
+                if e.0 == v || e.1 == v {
+                    can_remove = false;
+                    break;
+                }
+            }
+            if can_remove {
+                self.va.remove(&v);
+                self.vr.insert(v);
+            }
+        }
+    }
+
+    fn remove_edge(&mut self, u: Vertex, v: Vertex) {
+        if self.va.contains(&u) && self.va.contains(&v) {
+            self.er.insert((u, v));
+        }
+    }
 }
