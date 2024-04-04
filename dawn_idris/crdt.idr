@@ -437,3 +437,37 @@ Graph = (Vect Vertex, Vect Vertex, Vect Edge, Vect Edge)
 public export
 initialGraph : Graph
 initialGraph = ([], [], [], [])
+
+public export
+lookupVertex : Graph -> Vertex -> Bool
+lookupVertex (va, vr, _, _) v = elem v va && not (elem v vr)
+
+public export
+lookupEdge : Graph -> Edge -> Bool
+lookupEdge (va, vr, ea, er) (u, v) =
+  elem u va && elem v va && (elem (u, v) (ea ++ er))
+
+public export
+addVertex : Graph -> Vertex -> Graph
+addVertex (va, vr, ea, er) w = (w :: va, vr, ea, er)
+
+public export
+addEdge : Graph -> Edge -> Graph
+addEdge (va, vr, ea, er) e@(u, v) =
+  if elem u va && elem v va
+     then (va, vr, e :: ea, er)
+     else (va, vr, ea, er)
+
+public export
+removeVertex : Graph -> Vertex -> Graph
+removeVertex (va, vr, ea, er) w =
+  if elem w va && all (\(u, v) => u /= w && v /= w) (ea ++ er)
+     then (removeElem w va, w :: vr, ea, er)
+     else (va, vr, ea, er)
+
+public export
+removeEdge : Graph -> Edge -> Graph
+removeEdge (va, vr, ea, er) e@(u, v) =
+  if elem u va && elem v va
+     then (va, vr, ea, e :: er)
+     else (va, vr, ea, er)
