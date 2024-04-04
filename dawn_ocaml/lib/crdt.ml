@@ -392,4 +392,42 @@ module Graph2P = struct
       let c = compare u x in
       if c <> 0 then c else compare v y
   end)
+
+  let payload_set va vr ea er = (va, vr, ea, er)
+
+  let initial () = (VSet.empty, VSet.empty, ESet.empty, ESet.empty)
+
+  let lookup_vertex (va, vr, _, _) v = VSet.mem v (VSet.diff va vr)
+
+  let lookup_edge (va, vr, ea, er) (u, v) =
+    VSet.mem u va && VSet.mem v va && ESet.mem (u, v) (ESet.union ea er)
+
+  let add_vertex (va, vr, ea, er) w =
+    let va' = VSet.add w va in
+    (va', vr, ea, er)
+
+  let add_edge (va, vr, ea, er) u v =
+    let check_precond = VSet.mem u va && VSet.mem v va in
+    if check_precond then
+      let ea' = ESet.add (u, v) ea in
+      (va, vr, ea', er)
+    else
+      (va, vr, ea, er)
+
+  let remove_vertex (va, vr, ea, er) w =
+    let check_precond = VSet.mem w va && VSet.for_all (fun (u, v) -> u <> w && v <> w) (ESet.union ea er) in
+    if check_precond then
+      let va' = VSet.remove w va in
+      let vr' = VSet.add w vr in
+      (va', vr', ea, er)
+    else
+      (va, vr, ea, er)
+
+  let remove_edge (va, vr, ea, er) (u, v) =
+    let check_precond = VSet.mem u va && VSet.mem v va in
+    if check_precond then
+      let er' = ESet.add (u, v) er in
+      (va, vr, ea, er')
+    else
+      (va, vr, ea, er)
 end
