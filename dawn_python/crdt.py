@@ -8,7 +8,7 @@ Op-based require delivery order exists and concurrent updates commute
 '''
 
 from enum import Enum
-from typing import List, Tuple, TypeVar, Generic
+from typing import List, Set, Tuple, TypeVar, Generic
 from threading import Lock
 
 class Operation(Enum):
@@ -361,9 +361,39 @@ class ORSet:
 
 
 # Operation based 2P2P graph
-Vertex = int
-Edge = Tuple[Vertex, Vertex]
-Graph = Tuple[Set[Vertex], Set[Vertex], Set[Edge], Set[Edge]]
+class Graph2P:
+    Vertex = int
+    Edge = Tuple[Vertex, Vertex]
+    Graph = Tuple[Set[Vertex], Set[Vertex], Set[Edge], Set[Edge]]
 
-def initial_graph() -> Graph:
-    return set(), set(), set(), set()
+    def __init__(self):
+        self.va: Set[self.Vertex] = set()
+        self.vr: Set[self.Vertex] = set()
+        self.ea: Set[self.Edge] = set()
+        self.er: Set[self.Edge] = set()
+
+    def initial_graph(self) -> Graph:
+        return set(), set(), set(), set()
+
+    def lookup_vertex(self, v: Vertex) -> bool:
+        return v in self.va and v not in self.vr
+
+    def lookup_edge(self, e: Edge) -> bool:
+        u, v = e
+        return u in self.va and v in self.va and e in self.ea.union(self.er)
+
+    def add_vertex(self, w: Vertex) -> None:
+        self.va.add(w)
+
+    def add_edge(self, u: Vertex, v: Vertex) -> None:
+        if u in self.va and v in self.va:
+            self.ea.add((u, v))
+
+    def remove_vertex(self, w: Vertex) -> None:
+        if w in self.va and all(u != w and v != w for u, v in self.ea.union(self.er)):
+            self.va.remove(w)
+            self.vr.add(w)
+
+    def remove_edge(self, u: Vertex, v: Vertex) -> None:
+        if u in self.va and v in self.va:
+            self.er.add((u, v))
