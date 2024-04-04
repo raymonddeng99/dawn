@@ -704,3 +704,59 @@ func NewGraph() *Graph {
         Er: make(map[Edge]struct{}),
     }
 }
+
+func (g *Graph) LookupVertex(v Vertex) bool {
+    _, inVa := g.Va[v]
+    _, inVr := g.Vr[v]
+    return inVa && !inVr
+}
+
+func (g *Graph) LookupEdge(e Edge) bool {
+    _, inEa := g.Ea[e]
+    _, inEr := g.Er[e]
+    _, uInVa := g.Va[e.U]
+    _, vInVa := g.Va[e.V]
+    return (inEa || inEr) && uInVa && vInVa
+}
+
+func (g *Graph) AddVertex(v Vertex) {
+    g.Va[v] = struct{}{}
+}
+
+func (g *Graph) AddEdge(e Edge) {
+    if _, ok := g.Va[e.U]; ok {
+        if _, ok := g.Va[e.V]; ok {
+            g.Ea[e] = struct{}{}
+        }
+    }
+}
+
+func (g *Graph) RemoveVertex(v Vertex) {
+    if _, ok := g.Va[v]; ok {
+        canRemove := true
+        for e := range g.Ea {
+            if e.U == v || e.V == v {
+                canRemove = false
+                break
+            }
+        }
+        for e := range g.Er {
+            if e.U == v || e.V == v {
+                canRemove = false
+                break
+            }
+        }
+        if canRemove {
+            delete(g.Va, v)
+            g.Vr[v] = struct{}{}
+        }
+    }
+}
+
+func (g *Graph) RemoveEdge(e Edge) {
+    if _, ok := g.Va[e.U]; ok {
+        if _, ok := g.Va[e.V]; ok {
+            g.Er[e] = struct{}{}
+        }
+    }
+}
