@@ -439,3 +439,29 @@ type Graph = (Set.Set Vertex, Set.Set Vertex, Set.Set Edge, Set.Set Edge)
 
 initialGraph :: Graph
 initialGraph = (Set.empty, Set.empty, Set.empty, Set.empty)
+
+lookupVertex :: Graph -> Vertex -> Bool
+lookupVertex (va, vr, _, _) v = Set.member v (Set.difference va vr)
+
+lookupEdge :: Graph -> Edge -> Bool
+lookupEdge (va, vr, ea, er) (u, v) =
+  Set.member u va && Set.member v va && Set.member (u, v) (Set.union ea er)
+
+addVertex :: Graph -> Vertex -> Graph
+addVertex (va, vr, ea, er) w = (Set.insert w va, vr, ea, er)
+
+addEdge :: Graph -> Vertex -> Vertex -> Graph
+addEdge (va, vr, ea, er) u v
+  | Set.member u va && Set.member v va = (va, vr, Set.insert (u, v) ea, er)
+  | otherwise = (va, vr, ea, er)
+
+removeVertex :: Graph -> Vertex -> Graph
+removeVertex (va, vr, ea, er) w
+  | Set.member w va && all (\(u, v) -> u /= w && v /= w) (Set.union ea er) =
+    (Set.delete w va, Set.insert w vr, ea, er)
+  | otherwise = (va, vr, ea, er)
+
+removeEdge :: Graph -> Edge -> Graph
+removeEdge (va, vr, ea, er) (u, v)
+  | Set.member u va && Set.member v va = (va, vr, ea, Set.insert (u, v) er)
+  | otherwise = (va, vr, ea, er)
