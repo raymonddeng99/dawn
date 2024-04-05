@@ -465,3 +465,46 @@ removeEdge :: Graph -> Edge -> Graph
 removeEdge (va, vr, ea, er) (u, v)
   | Set.member u va && Set.member v va = (va, vr, ea, Set.insert (u, v) er)
   | otherwise = (va, vr, ea, er)
+
+-- Op-based add-only monotonic DAG
+module MonotonicDAG
+  ( Vertex, Edge, Graph
+  , initialGraph
+  , lookupVertex, lookupEdge, path
+  , addEdge, addBetween
+  ) where
+
+type Vertex = Int
+type Edge = (Vertex, Vertex)
+type Graph = ([Vertex], [Edge])
+
+initialGraph :: Graph
+initialGraph = ([-1, 1], [(-1, 1)])
+
+lookupVertex :: Graph -> Vertex -> Bool
+lookupVertex (vs, _) v = v `elem` vs
+
+lookupEdge :: Graph -> Edge -> Bool
+lookupEdge (_, es) e = e `elem` es
+
+path :: Graph -> Edge -> Bool
+path g@(vs, es) (u, v) =
+  any (\w1 -> w1 == u && any (\wm -> wm == v && pathBetween w1 wm) vs) vs
+  where
+    pathBetween w1 wm
+      | w1 == wm = True
+      | otherwise = case span (/= wm) (drop 1 vs) of
+                      (ws, w:_) -> (w1, w) `elem` es && pathBetween w wm
+                      _         -> False
+
+addEdge :: Graph -> Vertex -> Vertex -> Graph
+addEdge g@(vs, es) u v
+  | lookupVertex g u && lookupVertex g v && path g (u, v) = (vs, (u, v) : es)
+  | otherwise = g
+
+addBetween :: Graph -> Vertex -> Vertex -> Vertex -> Graph
+addBetween g@(vs, es) u v w
+  | lookupVertex g u && lookupVertex g v && lookupVertex g w &&
+    path g (u, w) && path g (v, w) && w /= u && w /= v =
+    (w:vs, (u, w) : (v, w) : es)
+  | otherwise = g
