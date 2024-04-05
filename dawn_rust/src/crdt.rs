@@ -678,3 +678,88 @@ impl Graph {
         }
     }
 }
+
+
+// Op-based add only monotonic DAG
+#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+pub struct MonotonicDAG<T>
+where
+    T: Eq + Hash + Copy,
+{
+    vertices: HashMap<T, bool>,
+    edges: HashMap<(T, T), bool>,
+}
+
+impl<T> MonotonicDAG<T>
+where
+    T: Eq + Hash + Copy,
+{
+    pub fn new() -> Self {
+        let mut dag = MonotonicDAG {
+            vertices: HashMap::new(),
+            edges: HashMap::new(),
+        };
+        dag.add_vertex(Vertex(0));
+        dag.add_vertex(Vertex(1));
+        dag.add_edge(Vertex(0), Vertex(1));
+        dag
+    }
+
+    pub fn lookup_vertex(&self, v: T) -> bool {
+        self.vertices.contains_key(&v)
+    }
+
+    pub fn lookup_edge(&self, e: (T, T)) -> bool {
+        self.edges.contains_key(&e)
+    }
+
+    pub fn add_vertex(&mut self, v: T) {
+        self.vertices.insert(v, true);
+    }
+
+    pub fn add_edge(&mut self, u: T, v: T) {
+        if self.lookup_vertex(u) && self.lookup_vertex(v) && self.path(u, v) {
+            self.edges.insert((u, v), true);
+        }
+    }
+
+    pub fn remove_vertex(&mut self, v: T) {
+        if self.lookup_vertex(v) {
+            for e in self.edges.keys() {
+                if e.0 == v || e.1 == v {
+                    return;
+                }
+            }
+            self.vertices.remove(&v);
+        }
+    }
+
+    pub fn remove_edge(&mut self, u: T, v: T) {
+        self.edges.remove(&(u, v));
+    }
+
+    fn path(&self, u: T, v: T) -> bool {
+        if !self.lookup_vertex(u) || !self.lookup_vertex(v) {
+            return false;
+        }
+        let mut visited: HashMap<T, bool> = HashMap::new();
+        let mut dfs = |w: T| {
+            if w == v {
+                return true;
+            }
+            if visited.contains_key(&w) {
+                return false;
+            }
+            visited.insert(w, true);
+            for (x, y) in &self.edges {
+                if *x == w {
+                    if dfs(*y) {
+                        return true;
+                    }
+                }
+            }
+            false
+        };
+        dfs(u)
+    }
+}
