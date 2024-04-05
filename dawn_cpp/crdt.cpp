@@ -604,3 +604,68 @@ public:
         }
     }
 };
+
+
+// Op-based add only monotonic DAG
+class MonotonicDAG {
+public:
+    MonotonicDAG() {
+        vertices.insert(-1);
+        vertices.insert(1);
+        edges[{-1, 1}] = true;
+    }
+
+    bool lookupVertex(Vertex v) const {
+        return vertices.count(v);
+    }
+
+    bool lookupEdge(const Edge& e) const {
+        return edges.count(e);
+    }
+
+    void addVertex(Vertex v) {
+        vertices.insert(v);
+    }
+
+    void addEdge(Vertex u, Vertex v) {
+        if (lookupVertex(u) && lookupVertex(v)) {
+            std::unordered_set<Vertex> visited;
+            if (dfs(u, v, visited)) {
+                edges[{u, v}] = true;
+            }
+        }
+    }
+
+    void removeVertex(Vertex v) {
+        if (lookupVertex(v)) {
+            bool canRemove = true;
+            for (const auto& [u, w] : edges) {
+                if (u.first == v || u.second == v) {
+                    canRemove = false;
+                    break;
+                }
+            }
+            if (canRemove) {
+                vertices.erase(v);
+            }
+        }
+    }
+
+    void removeEdge(Vertex u, Vertex v) {
+        edges.erase({u, v});
+    }
+private:
+    std::unordered_set<Vertex> vertices;
+    std::unordered_map<Edge, bool> edges;
+
+    bool dfs(Vertex u, Vertex v, std::unordered_set<Vertex>& visited) const {
+        if (u == v) return true;
+        if (visited.count(u)) return false;
+        visited.insert(u);
+        for (const auto& [x, y] : edges) {
+            if (x.first == u && dfs(x.second, v, visited))
+                return true;
+        }
+        return false;
+    }
+};
