@@ -471,3 +471,53 @@ removeEdge (va, vr, ea, er) e@(u, v) =
   if elem u va && elem v va
      then (va, vr, ea, e :: er)
      else (va, vr, ea, er)
+
+
+-- Op-based add only monotonic DAG
+module MonotonicDAG
+
+%access public export
+
+Vertex : Type
+Vertex = Int
+
+Edge : Type
+Edge = (Vertex, Vertex)
+
+Graph : Type
+Graph = (List Vertex, List Edge)
+
+initialGraph : Graph
+initialGraph = ([-1, 1], [(-1, 1)])
+
+lookupVertex : Graph -> Vertex -> Bool
+lookupVertex (vs, _) v = elem v vs
+
+lookupEdge : Graph -> Edge -> Bool
+lookupEdge (_, es) e = elem e es
+
+pathBetween : Graph -> Vertex -> Vertex -> Bool
+pathBetween g w1 wm =
+  if w1 == wm
+    then True
+    else case dropWhile (/= wm) (nub (drop 1 (fst g))) of
+           []      => False
+           (w::ws) => if lookupEdge g (w1, w)
+                        then pathBetween g w wm
+                        else False
+
+path : Graph -> Edge -> Bool
+path g (u, v) = any (\w1 => w1 == u && any (\wm => wm == v && pathBetween g w1 wm) (fst g)) (fst g)
+
+addEdge : Graph -> Vertex -> Vertex -> Graph
+addEdge g u v =
+  if lookupVertex g u && lookupVertex g v && path g (u, v)
+    then (fst g, (u, v) :: snd g)
+    else g
+
+addBetween : Graph -> Vertex -> Vertex -> Vertex -> Graph
+addBetween g u v w =
+  if lookupVertex g u && lookupVertex g v && lookupVertex g w &&
+     path g (u, w) && path g (v, w) && w /= u && w /= v
+    then (w :: fst g, (u, w) :: (v, w) :: snd g)
+    else g
