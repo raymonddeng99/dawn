@@ -760,3 +760,82 @@ func (g *Graph) RemoveEdge(e Edge) {
         }
     }
 }
+
+
+
+// Op-based add only monotonic DAG
+type MonotonicGraph struct {
+    vertices map[vertex]bool
+    edges    map[edge]bool
+}
+
+func newMonotonicGraph() *MonotonicGraph {
+    return &MonotonicGraph{
+        vertices: map[vertex]bool{-1: true, 1: true},
+        edges:    map[edge]bool{{-1, 1}: true},
+    }
+}
+
+func (g *MonotonicGraph) lookupVertex(v vertex) bool {
+    _, ok := g.vertices[v]
+    return ok
+}
+
+func (g *MonotonicGraph) lookupEdge(e edge) bool {
+    _, ok := g.edges[e]
+    return ok
+}
+
+func (g *MonotonicGraph) hasMonotonicPath(e edge) bool {
+    u, v := e.u, e.v
+    if !g.lookupVertex(u) || !g.lookupVertex(v) {
+        return false
+    }
+    visited := make(map[vertex]bool)
+    var dfs func(w vertex) bool
+    dfs = func(w vertex) bool {
+        if w == v {
+            return true
+        }
+        if visited[w] {
+            return false
+        }
+        visited[w] = true
+        for e := range g.edges {
+            if e.u == w {
+                if dfs(e.v) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+    return dfs(u)
+}
+
+func (g *MonotonicGraph) addVertex(v vertex) {
+    g.vertices[v] = true
+}
+
+func (g *MonotonicGraph) addEdge(u, v vertex) {
+    if g.lookupVertex(u) && g.lookupVertex(v) && g.hasMonotonicPath(edge{u, v}) {
+        g.edges[edge{u, v}] = true
+    }
+}
+
+func (g *MonotonicGraph) removeVertex(v vertex) {
+    if g.lookupVertex(v) {
+        for e := range g.edges {
+            if e.u == v || e.v == v {
+                return
+            }
+        }
+        delete(g.vertices, v)
+    }
+}
+
+func (g *MonotonicGraph) removeEdge(u, v vertex) {
+    if g.lookupVertex(u) && g.lookupVertex(v) {
+        delete(g.edges, edge{u, v})
+    }
+}
