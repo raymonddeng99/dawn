@@ -431,3 +431,48 @@ module Graph2P = struct
     else
       (va, vr, ea, er)
 end
+
+
+(* Op-based add-only monotonic DAG *)
+module MonotonicDAG = struct
+  type vertex = int
+  type edge = vertex * vertex
+  type graph = (vertex list, edge list) 
+
+  let initial_graph = ([-1; 1], [(-1, 1)])
+
+  let lookup_vertex (g: graph) (v: vertex) : bool =
+    List.mem v (fst g)
+
+  let lookup_edge (g: graph) (e: edge) : bool =
+    List.mem e (snd g)
+
+  let path (g: graph) (e: edge) : bool =
+    let vertices, edges = g in
+    let u, v = e in
+    let rec path_exists w1 wm =
+      w1 = u && wm = v && 
+      (let rec path_between wj wj_next =
+         if wj = wj_next then true
+         else if lookup_edge g (wj, wj_next) then true
+         else path_between wj_next (wj_next + 1)
+       in path_between w1 (w1 + 1))
+    in
+    List.exists (path_exists u) vertices &&
+    List.exists (path_exists v) vertices
+
+  let add_edge (g: graph) (u: vertex) (v: vertex) : graph =
+    let vertices, edges = g in
+    if lookup_vertex g u && lookup_vertex g v && path g (u, v) then
+      (vertices, (u, v) :: edges)
+    else
+      g
+
+  let add_between (g: graph) (u: vertex) (v: vertex) (w: vertex) : graph =
+    let vertices, edges = g in
+    if lookup_vertex g u && lookup_vertex g v && lookup_vertex g w &&
+       path g (u, w) && path g (v, w) && w <> u && w <> v then
+      (w :: vertices, (u, w) :: (v, w) :: edges)
+    else
+      g
+end
