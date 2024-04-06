@@ -521,3 +521,45 @@ addBetween g u v w =
      path g (u, w) && path g (v, w) && w /= u && w /= v
     then (w :: fst g, (u, w) :: (v, w) :: snd g)
     else g
+
+
+-- Add remove partial order
+module AddRemovePartialOrder
+
+public export
+data AddRemovePartialOrder : Type where
+  MkAddRemovePartialOrder : (vertices : List Int)
+                         -> (removed : List Int)
+                         -> (edges : List (Int, Int))
+                         -> AddRemovePartialOrder
+
+export
+initial : AddRemovePartialOrder
+initial = MkAddRemovePartialOrder [-1, 1] [] [(-1, 1)]
+
+export
+lookup : AddRemovePartialOrder -> Int -> Bool
+lookup (MkAddRemovePartialOrder vertices removed edges) v = elem v vertices
+
+export
+before : AddRemovePartialOrder -> Int -> Int -> Bool
+before po u v = any (\w => (w == u && lookup po v) ||
+                           (w == v && lookup po u) ||
+                           (lookup po w && elem (w, u) (edges po) && elem (w, v) (edges po))) (vertices po)
+  where
+    edges : AddRemovePartialOrder -> List (Int, Int)
+    edges (MkAddRemovePartialOrder vertices removed edges) = edges
+
+export
+addBetween : AddRemovePartialOrder -> Int -> Int -> Int -> Maybe AddRemovePartialOrder
+addBetween po u v w = if not (lookup po w) || not (before po u w) || not (before po w v)
+                      then Nothing
+                      else Just $ MkAddRemovePartialOrder (w :: vertices po) (removed po) (((u, w), (w, v)) :: edges po)
+
+export
+remove : AddRemovePartialOrder -> Int -> Maybe AddRemovePartialOrder
+remove po v = if not (lookup po v) || v == -1 || v == 1
+              then Nothing
+              else Just $ MkAddRemovePartialOrder (filter (/= v) (vertices po))
+                                                  (v :: removed po)
+                                                  (filter (\(x, y) => x /= v && y /= v) (edges po))
