@@ -669,3 +669,59 @@ private:
         return false;
     }
 };
+
+
+// Add remove partial order
+class AddRemovePartialOrder {
+public:
+    using Vertex = int;
+    using Edge = std::pair<Vertex, Vertex>;
+
+    AddRemovePartialOrder() {
+        vertices = {-1, 1};
+        edges = {{-1, 1}};
+    }
+
+    bool lookup(Vertex v) const {
+        return std::find(vertices.begin(), vertices.end(), v) != vertices.end();
+    }
+
+    bool before(Vertex u, Vertex v) const {
+        for (Vertex w : vertices) {
+            if ((w == u && lookup(v)) || (w == v && lookup(u))) {
+                return true;
+            }
+            if (lookup(w)) {
+                auto it1 = std::find(edges.begin(), edges.end(), std::make_pair(w, u));
+                auto it2 = std::find(edges.begin(), edges.end(), std::make_pair(w, v));
+                if (it1 != edges.end() && it2 != edges.end()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void addBetween(Vertex u, Vertex v, Vertex w) {
+        if (!lookup(w) || !before(u, w) || !before(w, v)) {
+            throw std::invalid_argument("addBetween precondition violated");
+        }
+        vertices.push_back(w);
+        edges.push_back(std::make_pair(u, w));
+        edges.push_back(std::make_pair(w, v));
+    }
+
+    void remove(Vertex v) {
+        if (!lookup(v) || v == -1 || v == 1) {
+            throw std::invalid_argument("remove precondition violated");
+        }
+        removed.push_back(v);
+        vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+        edges.erase(std::remove_if(edges.begin(), edges.end(), [v](const Edge& e) { return e.first == v || e.second == v; }), edges.end());
+    }
+
+private:
+    std::vector<Vertex> vertices;
+    std::vector<Vertex> removed;
+    std::vector<Edge> edges;
+};
