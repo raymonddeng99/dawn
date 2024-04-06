@@ -763,3 +763,64 @@ where
         dfs(u)
     }
 }
+
+
+// Add remove partial order
+mod add_remove_partial_order {
+    type Vertex = i32;
+    type Edge = (Vertex, Vertex);
+
+    pub struct AddRemovePartialOrder {
+        vertices: Vec<Vertex>,
+        removed: Vec<Vertex>,
+        edges: Vec<Edge>,
+    }
+
+    impl AddRemovePartialOrder {
+        pub fn initial() -> Self {
+            AddRemovePartialOrder {
+                vertices: vec![-1, 1],
+                removed: vec![],
+                edges: vec![(-1, 1)],
+            }
+        }
+
+        pub fn lookup(&self, v: Vertex) -> bool {
+            self.vertices.contains(&v)
+        }
+
+        pub fn before(&self, u: Vertex, v: Vertex) -> bool {
+            for w in &self.vertices {
+                if (*w == u && self.lookup(v))
+                    || (*w == v && self.lookup(u))
+                    || (self.lookup(*w)
+                        && self.edges.contains(&(*w, u))
+                        && self.edges.contains(&(*w, v)))
+                {
+                    return true;
+                }
+            }
+            false
+        }
+
+        pub fn add_between(&mut self, u: Vertex, v: Vertex, w: Vertex) -> Result<(), &'static str> {
+            if !self.lookup(w) || !self.before(u, w) || !self.before(w, v) {
+                return Err("addBetween precondition violated");
+            }
+            self.vertices.push(w);
+            self.edges.push((u, w));
+            self.edges.push((w, v));
+            Ok(())
+        }
+
+        pub fn remove(&mut self, v: Vertex) -> Result<(), &'static str> {
+            if !self.lookup(v) || v == -1 || v == 1 {
+                return Err("remove precondition violated");
+            }
+            self.removed.push(v);
+            self.vertices.retain(|&x| x != v);
+            self.edges.retain(|&(x, y)| x != v && y != v);
+            Ok(())
+        }
+    }
+}
