@@ -839,3 +839,85 @@ func (g *MonotonicGraph) removeEdge(u, v vertex) {
         delete(g.edges, edge{u, v})
     }
 }
+
+
+// Add remove partial order
+type AddRemovePartialOrder struct {
+    vertices []Vertex
+    removed  []Vertex
+    edges    []Edge
+}
+
+func Initial() *AddRemovePartialOrder {
+    return &AddRemovePartialOrder{
+        vertices: []Vertex{-1, 1},
+        removed:  []Vertex{},
+        edges:    []Edge{{-1, 1}},
+    }
+}
+
+func (po *AddRemovePartialOrder) Lookup(v Vertex) bool {
+    for _, u := range po.vertices {
+        if u == v {
+            return true
+        }
+    }
+    return false
+}
+
+func (po *AddRemovePartialOrder) Before(u, v Vertex) bool {
+    for _, w := range po.vertices {
+        if (w == u && po.Lookup(v)) || (w == v && po.Lookup(u)) {
+            return true
+        }
+        if po.Lookup(w) {
+            for _, e := range po.edges {
+                if e[0] == w && e[1] == u {
+                    for _, f := range po.edges {
+                        if f[0] == w && f[1] == v {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false
+}
+
+func (po *AddRemovePartialOrder) AddBetween(u, v, w Vertex) (*AddRemovePartialOrder, error) {
+    if !po.Lookup(w) || !po.Before(u, w) || !po.Before(w, v) {
+        return nil, fmt.Errorf("addBetween precondition violated")
+    }
+    newVertices := append(po.vertices, w)
+    newEdges := append(po.edges, Edge{u, w}, Edge{w, v})
+    return &AddRemovePartialOrder{
+        vertices: newVertices,
+        removed:  po.removed,
+        edges:    newEdges,
+    }, nil
+}
+
+func (po *AddRemovePartialOrder) Remove(v Vertex) (*AddRemovePartialOrder, error) {
+    if !po.Lookup(v) || v == -1 || v == 1 {
+        return nil, fmt.Errorf("remove precondition violated")
+    }
+    newVertices := []Vertex{}
+    for _, u := range po.vertices {
+        if u != v {
+            newVertices = append(newVertices, u)
+        }
+    }
+    newRemoved := append(po.removed, v)
+    newEdges := []Edge{}
+    for _, e := range po.edges {
+        if e[0] != v && e[1] != v {
+            newEdges = append(newEdges, e)
+        }
+    }
+    return &AddRemovePartialOrder{
+        vertices: newVertices,
+        removed:  newRemoved,
+        edges:    newEdges,
+    }, nil
+}
