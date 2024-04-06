@@ -508,3 +508,55 @@ addBetween g@(vs, es) u v w
     path g (u, w) && path g (v, w) && w /= u && w /= v =
     (w:vs, (u, w) : (v, w) : es)
   | otherwise = g
+
+
+-- Add remove partial order
+module AddRemovePartialOrder (
+    Vertex,
+    Edge,
+    PartialOrder(..),
+    initial,
+    lookup,
+    before,
+    addBetween,
+    remove
+) where
+
+type Vertex = Int
+type Edge = (Vertex, Vertex)
+
+data PartialOrder = PartialOrder
+    { vertices :: [Vertex]
+    , removed :: [Vertex]
+    , edges :: [Edge]
+    }
+
+initial :: PartialOrder
+initial = PartialOrder
+    { vertices = [-1, 1]
+    , removed = []
+    , edges = [(-1, 1)]
+    }
+
+lookup :: PartialOrder -> Vertex -> Bool
+lookup po v = v `elem` vertices po
+
+before :: PartialOrder -> Vertex -> Vertex -> Bool
+before po u v = any isBetween (vertices po)
+  where
+    isBetween w = (u == w && v `elem` vertices po) ||
+                  (v == w && u `elem` vertices po) ||
+                  (lookup po w && (u, w) `elem` edges po && (w, v) `elem` edges po)
+
+addBetween :: PartialOrder -> Vertex -> Vertex -> Vertex -> PartialOrder
+addBetween po u v w
+    | not (lookup po w) || not (before po u w) || not (before po w v) = error "addBetween precondition violated"
+    | otherwise = po { vertices = w : vertices po, edges = (u, w) : (w, v) : edges po }
+
+remove :: PartialOrder -> Vertex -> PartialOrder
+remove po v
+    | not (lookup po v) || v == -1 || v == 1 = error "remove precondition violated"
+    | otherwise = po { vertices = filter (/= v) (vertices po)
+                     , removed = v : removed po
+                     , edges = filter (\(x, y) -> x /= v && y /= v) (edges po)
+                     }
