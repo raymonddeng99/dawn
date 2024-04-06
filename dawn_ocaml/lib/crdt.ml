@@ -476,3 +476,47 @@ module MonotonicDAG = struct
     else
       g
 end
+
+
+(* Add-Remove Partial Order *)
+module AddRemovePartialOrder = struct
+  type vertex = int
+  type edge = vertex * vertex
+  type t = {
+    vertices : vertex list;
+    removed : vertex list;
+    edges : edge list;
+  }
+
+  let initial () = {
+    vertices = [-1; 1];
+    removed = [];
+    edges = [((-1), 1)];
+  }
+
+  let lookup t v =
+    List.mem v t.vertices
+
+  let before t u v =
+    let is_between w1 w2 =
+      w1 = u && w2 = v || (lookup t w1 && lookup t w2 && List.exists (fun (x, y) -> x = w1 && y = w2) t.edges)
+    in
+    List.exists (fun w -> is_between u w && is_between w v) t.vertices
+
+  let add_between t u v w =
+    if not (lookup t w) || not (before t u w) || not (before t w v) then
+      invalid_arg "addBetween precondition violated"
+    else
+      let vertices = w :: t.vertices in
+      let edges = (u, w) :: (w, v) :: t.edges in
+      { vertices; removed = t.removed; edges }
+
+  let remove t v =
+    if not (lookup t v) || v = -1 || v = 1 then
+      invalid_arg "remove precondition violated"
+    else
+      let removed = v :: t.removed in
+      let vertices = List.filter (fun x -> x <> v) t.vertices in
+      let edges = List.filter (fun (x, y) -> x <> v && y <> v) t.edges in
+      { vertices; removed; edges }
+end
