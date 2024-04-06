@@ -436,3 +436,36 @@ class MonotonicDAG:
     def remove_edge(self, u: Vertex, v: Vertex) -> None:
         if u in self.va and v in self.va:
             self.er.add((u, v))
+
+
+# Add remove partial order
+class AddRemovePartialOrder:
+    def __init__(self):
+        self.vertices = [-1, 1]
+        self.removed = []
+        self.edges = [(-1, 1)]
+
+    def lookup(self, v):
+        return v in self.vertices
+
+    def before(self, u, v):
+        for w in self.vertices:
+            if (w == u and self.lookup(v)) or (w == v and self.lookup(u)):
+                return True
+            if self.lookup(w) and (w, u) in self.edges and (w, v) in self.edges:
+                return True
+        return False
+
+    def add_between(self, u, v, w):
+        if not self.lookup(w) or not self.before(u, w) or not self.before(w, v):
+            raise ValueError("addBetween precondition violated")
+        self.vertices.append(w)
+        self.edges.append((u, w))
+        self.edges.append((w, v))
+
+    def remove(self, v):
+        if not self.lookup(v) or v == -1 or v == 1:
+            raise ValueError("remove precondition violated")
+        self.removed.append(v)
+        self.vertices = [x for x in self.vertices if x != v]
+        self.edges = [(x, y) for x, y in self.edges if x != v and y != v]
