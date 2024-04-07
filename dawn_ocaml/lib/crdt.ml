@@ -520,3 +520,49 @@ module AddRemovePartialOrder = struct
       let edges = List.filter (fun (x, y) -> x <> v && y <> v) t.edges in
       { vertices; removed; edges }
 end
+
+(* Replicated growth array *)
+module RGA = struct
+  type vertex = int * int
+  type rga = {
+    va : vertex list;
+    vr : vertex list;
+    edges : (vertex * vertex) list;
+    now : unit -> int;
+  }
+
+  let empty now = { va = [((-1), -1)]; vr = [((-1), 0)]; edges = []; now }
+
+  let lookup rga v = List.mem v rga.va && not (List.mem v rga.vr)
+
+  let before rga u v =
+    lookup rga u && lookup rga v &&
+    let rec exists w1 wm = match wm with
+      | [] -> false
+      | w::rest -> w1 = u && w = v || exists (snd w) rest
+    in
+    exists u (List.filter (fun (a, _) -> a = fst u) rga.edges)
+
+  let successor rga u =
+    if not (lookup rga u) then failwith "Vertex not found";
+    let rec succ v = match List.find_opt (fun w -> before rga u w && not (before rga w u)) rga.va with
+      | Some w -> w
+      | None -> succ ((-1), (rga.now ()) + 1)
+    in
+    succ ((-1), 0)
+
+  let decompose rga u = u
+
+  let addright rga u a =
+    let t = rga.now () in
+    let w = (a, t) in
+    if List.mem w rga.va || List.mem w rga.vr then failwith "Timestamp conflict";
+    { rga with
+      va = w :: rga.va;
+      edges = (u, w) :: (List.filter (fun (v, w') -> v <> u || w' <> w) rga.edges);
+    }
+
+  let remove rga w =
+    if not (lookup rga w) then failwith "Vertex not found";
+    { rga with vr = w :: rga.vr }
+end
