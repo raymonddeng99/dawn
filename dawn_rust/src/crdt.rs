@@ -824,3 +824,91 @@ mod add_remove_partial_order {
         }
     }
 }
+
+
+// Replicable growth array
+mod RGA {
+    use std::collections::{HashMap, HashSet};
+
+    type Vertex = (i32, i32);
+
+    pub struct RGA {
+        va: HashSet<Vertex>,
+        vr: HashSet<Vertex>,
+        edges: HashMap<Vertex, Vec<Vertex>>,
+        now: fn() -> i32,
+    }
+
+    impl RGA {
+        pub fn empty(now: fn() -> i32) -> Self {
+            let mut edges = HashMap::new();
+            edges.insert((-1, -1), vec![(-1, 0)]);
+
+            RGA {
+                va: HashSet::from([(-1, -1)]),
+                vr: HashSet::from([(-1, 0)]),
+                edges,
+                now,
+            }
+        }
+
+        pub fn lookup(&self, v: &Vertex) -> bool {
+            self.va.contains(v) && !self.vr.contains(v)
+        }
+
+        pub fn before(&self, u: &Vertex, v: &Vertex) -> bool {
+            self.lookup(u)
+                && self.lookup(v)
+                && self
+                    .va
+                    .iter()
+                    .any(|&w| (w == *u && self.va.contains(v))
+                        || (w == *v && self.va.contains(u))
+                        || (self.lookup(&w)
+                            && self.edges[&w].contains(u)
+                            && self.edges[&w].contains(v)))
+        }
+
+        pub fn successor(&self, u: &Vertex) -> Option<Vertex> {
+            if !self.lookup(u) {
+                return None;
+            }
+
+            self.va
+                .iter()
+                .filter(|&w| self.before(u, w) && !self.before(w, u))
+                .next()
+                .cloned()
+        }
+
+        pub fn decompose(&self, u: &Vertex) -> Vertex {
+            *u
+        }
+
+        pub fn add_right(&mut self, u: &Vertex, a: i32) -> Result<(), &'static str> {
+            let t = (self.now)();
+            let w = (a, t);
+
+            if self.lookup(&w) {
+                return Err("Timestamp conflict");
+            }
+
+            self.va.insert(w);
+            self.edges.entry(*u).or_insert_with(Vec::new).push(w);
+
+            Ok(())
+        }
+
+        pub fn remove(&mut self, w: &Vertex) -> Result<(), &'static str> {
+            if !self.lookup(w) {
+                return Err("Vertex not found");
+            }
+
+            self.vr.insert(*w);
+            self.va.remove(w);
+            self.edges.values_mut().for_each(|vec| vec.retain(|&v| v != *w));
+
+            Ok(())
+        }
+    }
+}
