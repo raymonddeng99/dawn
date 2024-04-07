@@ -8,7 +8,7 @@ Op-based require delivery order exists and concurrent updates commute
 '''
 
 from enum import Enum
-from typing import List, Set, Tuple, TypeVar, Generic
+from typing import List, Set, Tuple, Dict, Callable, TypeVar, Generic
 from threading import Lock
 
 class Operation(Enum):
@@ -469,3 +469,63 @@ class AddRemovePartialOrder:
         self.removed.append(v)
         self.vertices = [x for x in self.vertices if x != v]
         self.edges = [(x, y) for x, y in self.edges if x != v and y != v]
+
+
+# Replicable growth array
+Vertex = Tuple[int, int]
+Edge = Tuple[Vertex, Vertex]
+
+class RGA:
+    def __init__(self, now: Callable[[], int]):
+        self.va: Set[Vertex] = {(-1, -1)}
+        self.vr: Set[Vertex] = {(-1, 0)}
+        self.edges: Dict[Vertex, Set[Vertex]] = {(-1, -1): {(-1, 0)}}
+        self.now = now
+
+    def lookup(self, v: Vertex) -> bool:
+        return v in self.va and v not in self.vr
+
+    def before(self, u: Vertex, v: Vertex) -> bool:
+        if not (self.lookup(u) and self.lookup(v)):
+            return False
+
+        for w in self.va:
+            if (w == u and self.lookup(v)) or \
+               (w == v and self.lookup(u)) or \
+               (self.lookup(w) and u in self.edges[w] and v in self.edges[w]):
+                return True
+
+        return False
+
+    def successor(self, u: Vertex) -> Vertex:
+        if not self.lookup(u):
+            raise ValueError("Vertex not found")
+
+        for v in self.va:
+            if self.before(u, v) and not self.before(v, u):
+                return v
+
+        raise ValueError("No successor found")
+
+    def decompose(self, u: Vertex) -> Vertex:
+        return u
+
+    def add_right(self, u: Vertex, a: int) -> None:
+        t = self.now()
+        w = (a, t)
+
+        if self.lookup(w):
+            raise ValueError("Timestamp conflict")
+
+        self.va.add(w)
+        self.edges.setdefault(u, set()).add(w)
+
+    def remove(self, w: Vertex) -> None:
+        if not self.lookup(w):
+            raise ValueError("Vertex not found")
+
+        self.vr.add(w)
+        self.va.remove(w)
+
+        for u, neighbors in self.edges.items():
+            self.edges[u] = neighbors - {w}
