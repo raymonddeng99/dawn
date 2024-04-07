@@ -725,3 +725,90 @@ private:
     std::vector<Vertex> removed;
     std::vector<Edge> edges;
 };
+
+
+// Replicable growth array
+class RGA {
+public:
+    RGA(std::function<int()> now) {
+        va.insert(Vertex(-1, -1));
+        vr.insert(Vertex(-1, 0));
+        edges[Vertex(-1, -1)].push_back(Vertex(-1, 0));
+        this->now = now;
+    }
+
+    bool lookup(const Vertex& v) const {
+        return va.count(v) && !vr.count(v);
+    }
+
+    bool before(const Vertex& u, const Vertex& v) const {
+        if (!lookup(u) || !lookup(v)) {
+            return false;
+        }
+
+        for (const auto& w : va) {
+            if ((w == u && lookup(v)) ||
+                (w == v && lookup(u)) ||
+                (lookup(w) && edges.at(w).count(u) && edges.at(w).count(v))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::optional<Vertex> successor(const Vertex& u) const {
+        if (!lookup(u)) {
+            return std::nullopt;
+        }
+
+        for (const auto& v : va) {
+            if (before(u, v) && !before(v, u)) {
+                return v;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    Vertex decompose(const Vertex& u) const {
+        return u;
+    }
+
+    bool addRight(const Vertex& u, int a) {
+        int t = now();
+        Vertex w = std::make_pair(a, t);
+
+        if (lookup(w)) {
+            return false;
+        }
+
+        va.insert(w);
+        edges[u].insert(w);
+
+        return true;
+    }
+
+    bool remove(const Vertex& w) {
+        if (!lookup(w)) {
+            return false;
+        }
+
+        vr.insert(w);
+        va.erase(w);
+
+        for (auto& [u, neighbors] : edges) {
+            neighbors.erase(w);
+        }
+
+        return true;
+    }
+
+private:
+    using Vertex = std::pair<int, int>;
+    using Edge = std::pair<Vertex, Vertex>;
+    std::unordered_set<Vertex> va;
+    std::unordered_set<Vertex> vr;
+    std::unordered_map<Vertex, std::unordered_set<Vertex>> edges;
+    std::function<int()> now;
+};
