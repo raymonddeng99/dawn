@@ -563,3 +563,86 @@ remove po v = if not (lookup po v) || v == -1 || v == 1
               else Just $ MkAddRemovePartialOrder (filter (/= v) (vertices po))
                                                   (v :: removed po)
                                                   (filter (\(x, y) => x /= v && y /= v) (edges po))
+
+
+
+-- Replicable growth array
+module RGA
+
+%default total
+
+public export
+Vertex : Type
+Vertex = (Int, Int)
+
+public export
+Edge : Type
+Edge = (Vertex, Vertex)
+
+public export
+record RGA where
+  constructor MkRGA
+  va : SortedSet Vertex
+  vr : SortedSet Vertex
+  edges : SortedMap Vertex (SortedSet Vertex)
+  now : IO Int 
+
+public export
+empty : IO RGA
+empty = do
+  t <- primIO $ extern "idris_time_unix" (IO Int)
+  pure $ MkRGA
+    (singleton (-1, -1))
+    (singleton (-1, 0))
+    (fromList [((-1, -1), singleton (-1, 0))])
+    (const t)
+
+public export
+lookup : RGA -> Vertex -> Bool
+lookup (MkRGA va vr _) v = isElem v va && not (isElem v vr)
+
+public export
+before : RGA -> Vertex -> Vertex -> Bool
+before (MkRGA va _ edges) u v =
+  lookup (MkRGA va empty edges) u &&
+  lookup (MkRGA va empty edges) v &&
+  any (\w => (w == u && isElem v va) ||
+              (w == v && isElem u va) ||
+              (lookup (MkRGA va empty edges) w &&
+               isElem u (edges!(w)) &&
+               isElem v (edges!(w)))) (toList va)
+
+public export
+successor : RGA -> Vertex -> Maybe Vertex
+successor rga u =
+  if not (lookup rga u)
+    then Nothing
+    else find (\v => before rga u v && not (before rga v u)) (toList (va rga))
+
+public export
+decompose : RGA -> Vertex -> Vertex
+decompose _ v = v
+
+public export
+addRight : RGA -> Vertex -> Int -> IO RGA
+addRight (MkRGA va vr edges now) u a = do
+  t <- now
+  let w = (a, t)
+  if lookup (MkRGA va vr edges now) w
+    then pure $ MkRGA va vr edges now
+    else pure $ MkRGA
+           (insert w va)
+           vr
+           (insertWith union u (singleton w) edges)
+           now
+
+public export
+remove : RGA -> Vertex -> Maybe RGA
+remove (MkRGA va vr edges now) w =
+  if not (lookup (MkRGA va vr edges now) w)
+    then Nothing
+    else Just $ MkRGA
+           (delete w va)
+           (insert w vr)
+           (mapValues (delete w) edges)
+           now
