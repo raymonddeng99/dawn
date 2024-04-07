@@ -921,3 +921,118 @@ func (po *AddRemovePartialOrder) Remove(v Vertex) (*AddRemovePartialOrder, error
         edges:    newEdges,
     }, nil
 }
+
+
+// Replicable growth array
+type RGAVertex struct {
+    atom      int
+    timestamp int
+}
+
+type Edge struct {
+    u, v RGAVertex
+}
+
+type RGA struct {
+    va    map[RGAVertex]struct{}
+    vr    map[RGAVertex]struct{}
+    edges map[RGAVertex][]RGAVertex
+    now   func() int
+}
+
+func NewRGA(now func() int) *RGA {
+    return &RGA{
+        va:    map[RGAVertex]struct{}{RGAVertex{-1, -1}: {}},
+        vr:    map[RGAVertex]struct{}{RGAVertex{-1, 0}: {}},
+        edges: map[RGAVertex][]RGAVertex{RGAVertex{-1, -1}: {RGAVertex{-1, 0}}},
+        now:   now,
+    }
+}
+
+func (rga *RGA) lookup(v RGAVertex) bool {
+    _, inVA := rga.va[v]
+    _, inVR := rga.vr[v]
+    return inVA && !inVR
+}
+
+func (rga *RGA) before(u, v RGAVertex) bool {
+    if !rga.lookup(u) || !rga.lookup(v) {
+        return false
+    }
+
+    for w := range rga.va {
+        if (w == u && rga.lookup(v)) ||
+            (w == v && rga.lookup(u)) ||
+            (rga.lookup(w) && contains(rga.edges[w], u) && contains(rga.edges[w], v)) {
+            return true
+        }
+    }
+
+    return false
+}
+
+func (rga *RGA) successor(u RGAVertex) (RGAVertex, bool) {
+    if !rga.lookup(u) {
+        return RGAVertex{}, false
+    }
+
+    for v := range rga.va {
+        if rga.before(u, v) && !rga.before(v, u) {
+            return v, true
+        }
+    }
+
+    return RGAVertex{}, false
+}
+
+func (rga *RGA) decompose(u RGAVertex) RGAVertex {
+    return u
+}
+
+func (rga *RGA) addRight(u RGAVertex, a int) error {
+    t := rga.now()
+    w := RGAVertex{a, t}
+
+    if rga.lookup(w) {
+        return fmt.Errorf("Timestamp conflict")
+    }
+
+    rga.va[w] = struct{}{}
+    rga.edges[u] = append(rga.edges[u], w)
+
+    return nil
+}
+
+func (rga *RGA) remove(w RGAVertex) error {
+    if !rga.lookup(w) {
+        return fmt.Errorf("Vertex not found")
+    }
+
+    rga.vr[w] = struct{}{}
+    delete(rga.va, w)
+
+    for u, neighbors := range rga.edges {
+        rga.edges[u] = removeRGAVertex(neighbors, w)
+    }
+
+    return nil
+}
+
+func contains(vertices []RGAVertex, v RGAVertex) bool {
+    for _, u := range vertices {
+        if u == v {
+            return true
+        }
+    }
+    return false
+}
+
+func removeRGAVertex(vertices []RGAVertex, v RGAVertex) []RGAVertex {
+    result := make([]RGAVertex, 0, len(vertices))
+    for _, u := range vertices {
+        if u != v {
+            result = append(result, u)
+        }
+    }
+    return result
+}
