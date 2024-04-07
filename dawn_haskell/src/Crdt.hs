@@ -560,3 +560,64 @@ remove po v
                      , removed = v : removed po
                      , edges = filter (\(x, y) -> x /= v && y /= v) (edges po)
                      }
+
+-- Replicable growth array
+module RGA (
+    Vertex,
+    Edge,
+    RGA(..),
+    empty,
+    lookup,
+    before,
+    successor,
+    decompose,
+    addRight,
+    remove
+) where
+
+type Vertex = (Int, Int)
+type Edge = (Vertex, Vertex)
+
+data RGA = RGA {
+    va :: [Vertex],
+    vr :: [Vertex],
+    edges :: [Edge],
+    now :: IO Int
+}
+
+empty :: IO Int -> IO RGA
+empty nowFn = do
+    t <- nowFn
+    return $ RGA [((-1), (-1))] [((-1), 0)] [] nowFn
+
+lookup :: RGA -> Vertex -> Bool
+lookup rga v = v `elem` va rga && not (v `elem` vr rga)
+
+before :: RGA -> Vertex -> Vertex -> Bool
+before rga u v = lookup rga u && lookup rga v && any isBetween (va rga)
+  where
+    isBetween w = (u == w && v `elem` va rga) ||
+                  (v == w && u `elem` va rga) ||
+                  (lookup rga w && (u, w) `elem` edges rga && (w, v) `elem` edges rga)
+
+successor :: RGA -> Vertex -> Vertex
+successor rga u
+    | not (lookup rga u) = error "Vertex not found"
+    | otherwise = head $ dropWhile (`before` rga u) $ cycle $ va rga
+
+decompose :: RGA -> Vertex -> Vertex
+decompose _ v = v
+
+addRight :: RGA -> Vertex -> Int -> IO RGA
+addRight rga u a = do
+    t <- now rga
+    let w = (a, t)
+    if lookup rga w
+        then error "Timestamp conflict"
+        else return $ rga { va = w : va rga,
+                            edges = (u, w) : filter (\(v, w') -> v /= u || w' /= w) (edges rga) }
+
+remove :: RGA -> Vertex -> RGA
+remove rga w
+    | not (lookup rga w) = error "Vertex not found"
+    | otherwise = rga { vr = w : vr rga }
