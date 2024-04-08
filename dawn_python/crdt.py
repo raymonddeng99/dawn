@@ -529,3 +529,94 @@ class RGA:
 
         for u, neighbors in self.edges.items():
             self.edges[u] = neighbors - {w}
+
+
+# Continuous sequence
+class ContSeq:
+    class Node:
+        def __init__(self, value, identifier):
+            self.left_child = None
+            self.right_child = None
+            self.data = value
+            self.id = identifier
+
+        def cont_seq_insert(self, value, identifier):
+            if identifier < self.id:
+                if self.left_child is None:
+                    self.left_child = ContSeq.Node(value, identifier)
+                else:
+                    self.left_child.cont_seq_insert(value, identifier)
+            else:
+                if self.right_child is None:
+                    self.right_child = ContSeq.Node(value, identifier)
+                else:
+                    self.right_child.cont_seq_insert(value, identifier)
+
+        def cont_seq_lookup(self, identifier):
+            if identifier == self.id:
+                return self
+            elif identifier < self.id:
+                if self.left_child is None:
+                    return None
+                else:
+                    return self.left_child.cont_seq_lookup(identifier)
+            else:
+                if self.right_child is None:
+                    return None
+                else:
+                    return self.right_child.cont_seq_lookup(identifier)
+
+    def __init__(self):
+        self.root = None
+
+    def cont_seq_insert(self, value, identifier):
+        if self.root is None:
+            self.root = ContSeq.Node(value, identifier)
+        else:
+            self.root.cont_seq_insert(value, identifier)
+
+    def cont_seq_lookup(self, identifier):
+        if self.root is None:
+            return None
+        return self.root.cont_seq_lookup(identifier)
+
+    def cont_seq_allocate_identifier_between(self, id1, id2):
+        if len(id1) != 1 or len(id2) != 1:
+            return None
+
+        min_char = min(id1, id2)
+        max_char = max(id1, id2)
+
+        while True:
+            random_char = random.choice(string.ascii_letters)
+            if min_char < random_char < max_char:
+                return random_char
+
+    def cont_seq_add_between(self, value, id1, id2):
+        if self.root is None:
+            self.root = ContSeq.Node(value, self.cont_seq_allocate_identifier_between(id1, id2))
+            return
+
+        new_id = self.cont_seq_allocate_identifier_between(id1, self.root.id)
+        if new_id is not None:
+            self.root.left_child = self.cont_seq_add_between_recursive(self.root.left_child, value, id1, new_id)
+            return
+
+        new_id = self.cont_seq_allocate_identifier_between(self.root.id, id2)
+        if new_id is not None:
+            self.root.right_child = self.cont_seq_add_between_recursive(self.root.right_child, value, new_id, id2)
+            return
+
+    def cont_seq_add_between_recursive(self, current, value, id1, id2):
+        if current is None:
+            return ContSeq.Node(value, self.cont_seq_allocate_identifier_between(id1, id2))
+
+        new_id = self.cont_seq_allocate_identifier_between(id1, current.id)
+        if new_id is not None:
+            current.left_child = self.cont_seq_add_between_recursive(current.left_child, value, id1, new_id)
+
+        new_id = self.cont_seq_allocate_identifier_between(current.id, id2)
+        if new_id is not None:
+            current.right_child = self.cont_seq_add_between_recursive(current.right_child, value, new_id, id2)
+
+        return current
