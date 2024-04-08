@@ -812,3 +812,117 @@ private:
     std::unordered_map<Vertex, std::unordered_set<Vertex>> edges;
     std::function<int()> now;
 };
+
+
+
+using Identifier = std::string;
+
+// Continuous sequence
+class ContSeq {
+public:
+    class Node {
+    public:
+        Node* left = nullptr;
+        Node* right = nullptr;
+        std::string data;
+        Identifier id;
+
+        Node(const std::string& value, const Identifier& id) : data(value), id(id) {}
+
+        void insert(const std::string& value, const Identifier& id) {
+            if (id < this->id) {
+                if (left == nullptr) {
+                    left = new Node(value, id);
+                } else {
+                    left->insert(value, id);
+                }
+            } else {
+                if (right == nullptr) {
+                    right = new Node(value, id);
+                } else {
+                    right->insert(value, id);
+                }
+            }
+        }
+
+        Node* lookup(const Identifier& id) {
+            if (id == this->id) {
+                return this;
+            } else if (id < this->id) {
+                if (left == nullptr) {
+                    return nullptr;
+                }
+                return left->lookup(id);
+            } else {
+                if (right == nullptr) {
+                    return nullptr;
+                }
+                return right->lookup(id);
+            }
+        }
+    };
+
+    Node* root = nullptr;
+
+    void insert(const std::string& value, const Identifier& id) {
+        if (root == nullptr) {
+            root = new Node(value, id);
+        } else {
+            root->insert(value, id);
+        }
+    }
+
+    Node* lookup(const Identifier& id) {
+        if (root == nullptr) {
+            return nullptr;
+        }
+        return root->lookup(id);
+    }
+
+    Identifier allocateIdentifierBetween(const Identifier& id1, const Identifier& id2) {
+        if (id1.length() != 1 || id2.length() != 1) {
+            return "";
+        }
+
+        char min_char = std::min(id1[0], id2[0]);
+        char max_char = std::max(id1[0], id2[0]);
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(min_char + 1, max_char - 1);
+
+        char random_char = static_cast<char>(dis(gen));
+        while (random_char == min_char || random_char == max_char) {
+            random_char = static_cast<char>(dis(gen));
+        }
+
+        return std::string(1, random_char);
+    }
+
+    void addBetween(const std::string& value, const Identifier& id1, const Identifier& id2) {
+        if (root == nullptr) {
+            root = new Node(value, allocateIdentifierBetween(id1, id2));
+        } else {
+            root = addBetweenRecursive(root, value, id1, id2);
+        }
+    }
+
+private:
+    Node* addBetweenRecursive(Node* current, const std::string& value, const Identifier& id1, const Identifier& id2) {
+        if (current == nullptr) {
+            return new Node(value, allocateIdentifierBetween(id1, id2));
+        }
+
+        Identifier newId = allocateIdentifierBetween(id1, current->id);
+        if (!newId.empty()) {
+            current->left = addBetweenRecursive(current->left, value, id1, newId);
+        }
+
+        newId = allocateIdentifierBetween(current->id, id2);
+        if (!newId.empty()) {
+            current->right = addBetweenRecursive(current->right, value, newId, id2);
+        }
+
+        return current;
+    }
+};
