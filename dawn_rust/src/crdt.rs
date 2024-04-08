@@ -912,3 +912,74 @@ mod RGA {
         }
     }
 }
+
+
+// Continuous sequence
+mod cont_sequence { 
+    type Identifier = String;
+    
+    #[derive(Debug, Clone)]
+    pub struct Node<T> {
+        pub left_child: Option<Box<Node<T>>>,
+        pub right_child: Option<Box<Node<T>>>,
+        pub data: (T, Identifier),
+    }
+    
+    impl<T: Ord> Node<T> {
+        pub fn new(value: T, id: Identifier) -> Self {
+            Node {
+                left_child: None,
+                right_child: None,
+                data: (value, id),
+            }
+        }
+    
+        pub fn insert(&mut self, value: T, id: Identifier) {
+            if id < self.data.1 {
+                match &mut self.left_child {
+                    Some(child) => child.insert(value, id),
+                    None => self.left_child = Some(Box::new(Node::new(value, id))),
+                }
+            } else {
+                match &mut self.right_child {
+                    Some(child) => child.insert(value, id),
+                    None => self.right_child = Some(Box::new(Node::new(value, id))),
+                }
+            }
+        }
+    
+        pub fn lookup(&self, id: &Identifier) -> Option<&(T, Identifier)> {
+            if id == &self.data.1 {
+                Some(&self.data)
+            } else if id < &self.data.1 {
+                self.left_child.as_ref().and_then(|child| child.lookup(id))
+            } else {
+                self.right_child.as_ref().and_then(|child| child.lookup(id))
+            }
+        }
+    }
+    
+    pub fn allocate_identifier_between<T: Ord>(id1: &Identifier, id2: &Identifier) -> Option<Identifier> {
+        if id1.len() != 1 || id2.len() != 1 {
+            return None;
+        }
+    
+        let min_char = std::cmp::min(id1.chars().next()?, id2.chars().next()?);
+        let max_char = std::cmp::max(id1.chars().next()?, id2.chars().next()?);
+    
+        let mut rng = rand::thread_rng();
+        let random_char = (min_char as u8..=max_char as u8)
+            .filter(|&c| c != min_char as u8 && c != max_char as u8)
+            .choose(&mut rng)
+            .map(|c| char::from(c));
+    
+        random_char.map(|c| c.to_string())
+    }
+    
+    pub fn add_between<T: Ord>(root: &mut Option<Box<Node<T>>>, value: T, id1: &Identifier, id2: &Identifier) {
+        if let Some(root_node) = root.as_mut() {
+            let new_id = allocate_identifier_between(id1, id2).unwrap();
+            root_node.insert(value, new_id);
+        }
+    }
+}
