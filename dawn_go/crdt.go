@@ -1036,3 +1036,84 @@ func removeRGAVertex(vertices []RGAVertex, v RGAVertex) []RGAVertex {
     }
     return result
 }
+
+
+
+// Continuous sequence
+type Identifier string
+
+type ContSeqNode struct {
+    left, right *ContSeqNode
+    data        interface{}
+    id          Identifier
+}
+
+func (n *ContSeqNode) ContSeqInsert(value interface{}, id Identifier) {
+    if id < n.id {
+        if n.left == nil {
+            n.left = &ContSeqNode{data: value, id: id}
+        } else {
+            n.left.ContSeqInsert(value, id)
+        }
+    } else {
+        if n.right == nil {
+            n.right = &ContSeqNode{data: value, id: id}
+        } else {
+            n.right.ContSeqInsert(value, id)
+        }
+    }
+}
+
+func (n *ContSeqNode) ContSeqLookup(id Identifier) *ContSeqNode {
+    if id == n.id {
+        return n
+    } else if id < n.id {
+        if n.left == nil {
+            return nil
+        }
+        return n.left.ContSeqLookup(id)
+    } else {
+        if n.right == nil {
+            return nil
+        }
+        return n.right.ContSeqLookup(id)
+    }
+}
+
+func ContSeqAllocateIdentifierBetween(id1, id2 Identifier) Identifier {
+    if len(id1) != 1 || len(id2) != 1 {
+        return ""
+    }
+
+    min, max := id1, id2
+    if id1 > id2 {
+        min, max = id2, id1
+    }
+
+    for {
+        randomChar := byte(min[0]) + byte(rand.Intn(int(max[0]-min[0])))
+        if randomChar != min[0] && randomChar != max[0] {
+            return Identifier(randomChar)
+        }
+    }
+}
+
+func ContSeqAddBetween(root *ContSeqNode, value interface{}, id1, id2 Identifier) *ContSeqNode {
+    if root == nil {
+        return &ContSeqNode{data: value, id: ContSeqAllocateIdentifierBetween(id1, id2)}
+    }
+
+    newId := ContSeqAllocateIdentifierBetween(id1, root.id)
+    if newId != "" {
+        root.left = ContSeqAddBetween(root.left, value, id1, newId)
+        return root
+    }
+
+    newId = ContSeqAllocateIdentifierBetween(root.id, id2)
+    if newId != "" {
+        root.right = ContSeqAddBetween(root.right, value, newId, id2)
+        return root
+    }
+
+    return root
+}
