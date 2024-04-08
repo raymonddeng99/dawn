@@ -621,3 +621,93 @@ remove :: RGA -> Vertex -> RGA
 remove rga w
     | not (lookup rga w) = error "Vertex not found"
     | otherwise = rga { vr = w : vr rga }
+
+
+
+-- Continuous sequence
+module ContSequence where
+
+import Data.Maybe (isJust, isNothing)
+
+data Node a = Node { leftChild :: Maybe (Node a)
+                   , rightChild :: Maybe (Node a)
+                   , nodeData :: (a, String)
+                   } deriving (Show)
+
+type Sequence a = Maybe (Node a)
+
+emptySequence :: Sequence a
+emptySequence = Nothing
+
+insertNode :: (Ord a) => (a, String) -> Sequence a -> Sequence a
+insertNode (x, id) seq =
+  case seq of
+    Nothing -> Just $ Node Nothing Nothing (x, id)
+    Just n ->
+      let (_, nid) = nodeData n
+      in if id < nid
+           then Just $ Node (insertNode (x, id) (leftChild n)) (rightChild n) (nodeData n)
+           else Just $ Node (leftChild n) (insertNode (x, id) (rightChild n)) (nodeData n)
+
+lookUp :: (Ord a) => String -> Sequence a -> Bool
+lookUp id seq =
+  case binarySearch id seq of
+    Nothing -> False
+    Just _  -> True
+
+binarySearch :: (Ord a) => String -> Sequence a -> Maybe (Node a)
+binarySearch id seq =
+  case seq of
+    Nothing     -> Nothing
+    Just n      ->
+      let (_, nid) = nodeData n
+      in if id == nid
+           then Just n
+           else if id < nid
+                  then binarySearch id (leftChild n)
+                  else binarySearch id (rightChild n)
+
+decompose :: (Ord a) => String -> Sequence a -> (a, String)
+decompose id seq =
+  case binarySearch id seq of
+    Nothing -> error "Identifier not found"
+    Just n  -> nodeData n
+
+before :: (Ord a) => String -> String -> Sequence a -> Bool
+before id1 id2 seq =
+  let (_, i1) = decompose id1 seq
+      (_, i2) = decompose id2 seq
+  in i1 < i2
+
+allocateIdentifierBetween :: String -> String -> Sequence a -> Maybe String
+allocateIdentifierBetween id1 id2 seq =
+  if null id1 || null id2 || length id1 /= 1 || length id2 /= 1
+    then Nothing
+    else Just [generateNewId (head id1) (head id2)]
+
+generateNewId :: Char -> Char -> Char
+generateNewId c1 c2 =
+  let min = min (ord c1) (ord c2)
+      max = max (ord c1) (ord c2)
+      randomChar = chr $ min + 1 + randomNumber (max - min - 1)
+  in randomChar
+
+randomNumber :: Int -> Int
+randomNumber n = _
+
+addBetween :: (Ord a) => (a, String) -> String -> (a, String) -> Sequence a -> Sequence a
+addBetween e id2 e' seq =
+  case (binarySearch (fst e) seq, binarySearch (fst e') seq) of
+    (Just n1, Nothing) ->
+      let (_, id1) = nodeData n1
+          newId    = allocateIdentifierBetween id1 id2 seq
+      in case newId of
+           Nothing       -> seq
+           Just newIdStr -> insertNode (snd e, newIdStr) (Just $ Node (leftChild n1) Nothing n1)
+    (Nothing, Just n2) ->
+      let (_, id2') = nodeData n2
+          newId     = allocateIdentifierBetween id2 id2' seq
+      in case newId of
+           Nothing       -> seq
+           Just newIdStr -> insertNode (snd e, newIdStr) (Just $ Node Nothing (rightChild n2) n2)
+    _ -> seq
