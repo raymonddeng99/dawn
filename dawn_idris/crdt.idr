@@ -646,3 +646,66 @@ remove (MkRGA va vr edges now) w =
            (insert w vr)
            (mapValues (delete w) edges)
            now
+
+
+-- Continuous seq
+module ContSequence
+
+import Data.Strings
+
+%default total
+
+data ContSeqNode : Type -> Type where
+  Leaf : ContSeqNode a
+  Node : (left : ContSeqNode a)
+      -> (right : ContSeqNode a)
+      -> (data : a)
+      -> (id : String)
+      -> ContSeqNode a
+
+contSeqInsert : Ord a => (value : a) -> (id : String) -> ContSeqNode a -> ContSeqNode a
+contSeqInsert value id node@(Node left right data node_id) =
+  if id < node_id
+    then Node (contSeqInsert value id left) right data node_id
+    else Node left (contSeqInsert value id right) data node_id
+contSeqInsert value id Leaf = Node Leaf Leaf value id
+
+contSeqLookup : (id : String) -> ContSeqNode a -> Maybe (a, String)
+contSeqLookup id (Node left right data node_id) =
+  if id == node_id
+    then Just (data, node_id)
+    else if id < node_id
+      then contSeqLookup id left
+      else contSeqLookup id right
+contSeqLookup id Leaf = Nothing
+
+contSeqAllocateIdentifierBetween : (id1 : String) -> (id2 : String) -> Maybe String
+contSeqAllocateIdentifierBetween id1 id2 =
+  if length id1 /= 1 || length id2 /= 1
+    then Nothing
+    else do
+      let min_char = min (head id1) (head id2)
+      let max_char = max (head id1) (head id2)
+      let random_char = Data.Strings.singleton (randomRange min_char max_char)
+      pure random_char
+
+contSeqAddBetween : (value : a)
+                 -> (id1 : String)
+                 -> (id2 : String)
+                 -> ContSeqNode a
+                 -> ContSeqNode a
+contSeqAddBetween value id1 id2 root =
+  case root of
+    Leaf => case contSeqAllocateIdentifierBetween id1 id2 of
+              Just new_id => Node Leaf Leaf value new_id
+              Nothing => Leaf
+    Node left right data node_id =>
+      case contSeqAllocateIdentifierBetween id1 node_id of
+        Just new_id =>
+          Node (contSeqAddBetween value id1 new_id left) right data node_id
+        Nothing =>
+          case contSeqAllocateIdentifierBetween node_id id2 of
+            Just new_id =>
+              Node left (contSeqAddBetween value new_id id2 right) data node_id
+            Nothing =>
+              root
