@@ -566,3 +566,71 @@ module RGA = struct
     if not (lookup rga w) then failwith "Vertex not found";
     { rga with vr = w :: rga.vr }
 end
+
+(* Continuous Sequence *)
+module ContSequence = struct
+  type identifier = string
+
+  type 'a node = {
+    left_child : 'a node option;
+    right_child : 'a node option;
+    data : 'a * identifier;
+  }
+
+  let mutable root : 'a node option = None
+
+  let rec binary_search node id =
+    match node with
+    | None -> None
+    | Some n ->
+        let node_id = snd n.data in
+        if id = node_id then
+          Some n
+        else if id < node_id then
+          binary_search n.left_child id
+        else
+          binary_search n.right_child id
+
+  let look_up id =
+    match binary_search root id with
+    | None -> false
+    | Some _ -> true
+
+  let decompose id =
+    match binary_search root id with
+    | None -> failwith "Identifier not found"
+    | Some n -> n.data
+
+  let before id1 id2 =
+    let _, i1 = decompose id1 in
+    let _, i2 = decompose id2 in
+    i1 < i2
+
+  let allocate_identifier_between id1 id2 =
+    let min_char, max_char =
+      if id1 < id2 then (id1, id2)
+      else (id2, id1)
+    in
+    if String.length min_char <> 1 || String.length max_char <> 1 then
+      failwith "Invalid input: input strings must have length 1"
+    else begin
+      let min_ascii = Char.code min_char.[0] in
+      let max_ascii = Char.code max_char.[0] in
+      let random_ascii = min_ascii + Random.int (max_ascii - min_ascii) in
+      Char.chr random_ascii
+    end
+
+  let add_between e b e' as_child_of_e =
+    let node_e = binary_search root e in
+    let node_e' = binary_search root e' in
+    match (node_e, node_e') with
+    | (Some n1, None) ->
+        let new_id = allocate_identifier_between (snd n1.data) e' in
+        let new_node = { left_child = None; right_child = Some n1.right_child; data = (b, new_id) } in
+        n1.right_child <- Some new_node
+    | (None, Some n2) ->
+        let new_id = allocate_identifier_between e n2.data in
+        let new_node = { left_child = Some n2.left_child; right_child = None; data = (b, new_id) } in
+        n2.left_child <- Some new_node
+    | _ -> failwith "One or both identifiers not found"
+end
