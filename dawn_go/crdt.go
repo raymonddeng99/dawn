@@ -1117,3 +1117,35 @@ func ContSeqAddBetween(root *ContSeqNode, value interface{}, id1, id2 Identifier
 
     return root
 }
+
+func ContSeqRemove(root *ContSeqNode, id Identifier) *ContSeqNode {
+    if root == nil {
+        return nil
+    }
+
+    if id == root.id {
+        if root.left == nil {
+            return root.right
+        }
+        if root.right == nil {
+            return root.left
+        }
+
+        successor := root.right
+        for successor.left != nil {
+            successor = successor.left
+        }
+
+        root.data, root.id = successor.data, successor.id
+        root.right = ContSeqRemove(root.right, successor.id)
+        return root
+    }
+
+    if id < root.id {
+        root.left = ContSeqRemove(root.left, id)
+    } else {
+        root.right = ContSeqRemove(root.right, id)
+    }
+
+    return root
+}
