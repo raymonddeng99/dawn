@@ -711,3 +711,26 @@ addBetween e id2 e' seq =
            Nothing       -> seq
            Just newIdStr -> insertNode (snd e, newIdStr) (Just $ Node Nothing (rightChild n2) n2)
     _ -> seq
+
+remove :: (Ord a) => String -> Sequence a -> Sequence a
+remove id seq = case binarySearch id seq of
+  Nothing -> seq
+  Just node -> removeNode node seq
+
+removeNode :: (Ord a) => Node a -> Sequence a -> Sequence a
+removeNode node seq = case (leftChild node, rightChild node) of
+  (Nothing, Nothing) -> emptySequence
+  (Just left, Nothing) -> Just left
+  (Nothing, Just right) -> Just right
+  (Just left, Just right) -> Just $ Node left' right' (nodeData successor)
+    where
+      successor = findSuccessor right
+      left' = removeNode successor (Just left)
+      right' = rightChild successor
+
+findSuccessor :: (Ord a) => Sequence a -> Node a
+findSuccessor (Just node) =
+  case leftChild node of
+    Nothing -> node
+    Just left -> findSuccessor (Just left)
+findSuccessor Nothing = error "No successor found"
