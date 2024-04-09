@@ -633,4 +633,36 @@ module ContSequence = struct
         let new_node = { left_child = Some n2.left_child; right_child = None; data = (b, new_id) } in
         n2.left_child <- Some new_node
     | _ -> failwith "One or both identifiers not found"
+
+  let remove e =
+    let rec remove_node node =
+        match node with
+        | None -> None
+        | Some n ->
+            let id, _ = n.data in
+            if id = e then
+              (match n.left_child, n.right_child with
+              | None, None -> None
+              | Some left, None -> left
+              | None, Some right -> right
+              | Some left, Some right ->
+                  let rec find_successor node =
+                    match node with
+                    | None -> None
+                    | Some n ->
+                        (match n.left_child with
+                        | None -> Some n
+                        | Some left -> find_successor (Some left))
+                  in
+                  match find_successor n.right_child with
+                  | None -> failwith "Unexpected case"
+                  | Some successor ->
+                      successor.left_child <- n.left_child;
+                      Some successor)
+            else
+              Some { n with
+                     left_child = remove_node n.left_child;
+                     right_child = remove_node n.right_child }
+      in
+      root <- remove_node root;
 end
