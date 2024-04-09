@@ -982,4 +982,31 @@ mod cont_sequence {
             root_node.insert(value, new_id);
         }
     }
+
+    pub fn remove<T: Ord>(&mut self, id: &Identifier) -> Option<Box<Node<T>>> {
+        if id == &self.data.1 {
+            if self.left_child.is_none() {
+                return self.right_child.take();
+            }
+            if self.right_child.is_none() {
+                return self.left_child.take();
+            }
+
+            let mut successor = self.right_child.as_mut().unwrap();
+            while successor.left_child.is_some() {
+                successor = successor.left_child.as_mut().unwrap();
+            }
+
+            std::mem::swap(&mut self.data, &mut successor.data);
+            self.right_child = successor.right_child.take().and_then(|mut node| node.remove(&self.data.1));
+            self.left_child.as_mut().map(|node| node.remove(&self.data.1));
+            Some(self.to_owned())
+        } else if id < &self.data.1 {
+            self.left_child = self.left_child.as_mut().and_then(|node| node.remove(id));
+            Some(self.to_owned())
+        } else {
+            self.right_child = self.right_child.as_mut().and_then(|node| node.remove(id));
+            Some(self.to_owned())
+        }
+    }
 }
