@@ -709,3 +709,61 @@ contSeqAddBetween value id1 id2 root =
               Node left (contSeqAddBetween value new_id id2 right) data node_id
             Nothing =>
               root
+
+contSeqRemove : (id : String) -> ContSeqNode a -> ContSeqNode a
+contSeqRemove id node = let removeResult = removeNode id node in
+                        case removeResult of
+                             (True, newNode) => newNode
+                             (False, _) => node
+
+removeNode : (id : String) -> ContSeqNode a -> (Bool, ContSeqNode a)
+removeNode id node@(Node left right data node_id) =
+  if id == node_id
+     then removeCurrentNode left right data
+     else if id < node_id
+             then case removeNode id left of
+                       (True, newLeft) => (True, Node newLeft right data node_id)
+                       (False, _) => (False, node)
+             else case removeNode id right of
+                       (True, newRight) => (True, Node left newRight data node_id)
+                       (False, _) => (False, node)
+removeNode id Leaf = (False, Leaf)
+
+removeCurrentNode : ContSeqNode a -> ContSeqNode a -> a -> (Bool, ContSeqNode a)
+removeCurrentNode left right data =
+  case left of
+       Leaf => case right of
+                    Leaf => (True, Leaf)
+                    Node _ _ _ _ => let successor = findSuccessor right in
+                                     (True, Node Leaf (removeSuccessor successor right) (getData successor) (getId successor))
+       Node _ _ _ _ => case right of
+                            Leaf => let predecessor = findPredecessor left in
+                                     (True, Node (removePredecessor predecessor left) Leaf (getData predecessor) (getId predecessor))
+                            Node _ _ _ _ => let successor = findSuccessor right in
+                                             (True, Node left (removeSuccessor successor right) (getData successor) (getId successor))
+
+findSuccessor : ContSeqNode a -> ContSeqNode a
+findSuccessor (Node left Leaf _ _) = left
+findSuccessor (Node left right _ _) = findSuccessor right
+
+removeSuccessor : ContSeqNode a -> ContSeqNode a -> ContSeqNode a
+removeSuccessor node@(Node left right data id) tree =
+  case left of
+       Leaf => tree
+       Node _ _ _ _ => Node (removeSuccessor left tree) right data id
+
+getData : ContSeqNode a -> a
+getData (Node _ _ data _) = data
+
+getId : ContSeqNode a -> String
+getId (Node _ _ _ id) = id
+
+findPredecessor : ContSeqNode a -> ContSeqNode a
+findPredecessor (Node left Leaf _ _) = left
+findPredecessor (Node left right _ _) = findPredecessor right
+
+removePredecessor : ContSeqNode a -> ContSeqNode a -> ContSeqNode a
+removePredecessor node@(Node left right data id) tree =
+  case right of
+       Leaf => tree
+       Node _ _ _ _ => Node left (removePredecessor right tree) data id
