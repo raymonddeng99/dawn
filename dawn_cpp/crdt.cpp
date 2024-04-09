@@ -907,6 +907,43 @@ public:
         }
     }
 
+    void remove(const Identifier& id) {
+        Node* node = lookup(id);
+        if (node == nullptr) {
+            throw std::runtime_error("Element not found in set");
+        }
+
+        removeNode(node);
+
+        if (lookup(id) != nullptr) {
+            throw std::runtime_error("Removal failed");
+        }
+    }
+
+    void removeNode(Node* node) {
+        if (node->left == nullptr) {
+            Node* rightChild = node->right;
+            *node = *node->right;
+            delete rightChild;
+        } else if (node->right == nullptr) {
+            Node* leftChild = node->left;
+            *node = *node->left;
+            delete leftChild;
+        } else {
+            Node* successor = findSuccessor(node->right);
+            std::swap(node->data, successor->data);
+            std::swap(node->id, successor->id);
+            removeNode(successor);
+        }
+    }
+
+    Node* ContSeq::findSuccessor(Node* node) {
+        if (node->left == nullptr) {
+            return node;
+        }
+        return findSuccessor(node->left);
+    }
+
 private:
     Node* addBetweenRecursive(Node* current, const std::string& value, const Identifier& id1, const Identifier& id2) {
         if (current == nullptr) {
