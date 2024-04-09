@@ -620,3 +620,30 @@ class ContSeq:
             current.right_child = self.cont_seq_add_between_recursive(current.right_child, value, new_id, id2)
 
         return current
+
+    def cont_seq_remove(self, identifier):
+        node = self.cont_seq_lookup(identifier)
+        if node is None:
+            raise ValueError("Element not found in set")
+
+        self.cont_seq_remove_node(node)
+
+        if self.cont_seq_lookup(identifier) is not None:
+            raise RuntimeError("Removal failed")
+
+    def cont_seq_remove_node(self, node):
+        if node.left_child is None:
+            node.data, node.id = node.right_child.data, node.right_child.id
+            node.right_child = node.right_child.right_child
+        elif node.right_child is None:
+            node.data, node.id = node.left_child.data, node.left_child.id
+            node.left_child = node.left_child.left_child
+        else:
+            successor = self.find_successor(node.right_child)
+            node.data, node.id, successor.data, successor.id = successor.data, successor.id, node.data, node.id
+            self.cont_seq_remove_node(successor)
+
+    def find_successor(self, node):
+        if node.left_child is None:
+            return node
+        return self.find_successor(node.left_child)
