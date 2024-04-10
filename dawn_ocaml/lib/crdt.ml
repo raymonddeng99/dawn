@@ -666,3 +666,32 @@ module ContSequence = struct
       in
       root <- remove_node root;
 end
+
+(* Op-based observed-remove shopping cart *)
+module ORCart = struct
+  type isbn = string
+  type unique_tag = string
+  type payload = (isbn * int * unique_tag) list
+
+  let empty_payload = []
+
+  let get_quantity (payload : payload) (k : isbn) : int =
+    let quantities = List.filter (fun (k', _, _) -> k' = k) payload in
+    List.fold_left (fun acc (_, n, _) -> acc + n) 0 quantities
+
+  let add (payload : payload) (k : isbn) (n : int) : payload =
+    let existing_quantity = get_quantity payload k in
+    let new_unique_tag = Digest.string (Random.int max_int |> string_of_int) |> Digest.to_hex in
+    (k, n + existing_quantity, new_unique_tag) :: List.filter (fun (k', _, _) -> k' <> k) payload
+
+  let remove (payload : payload) (k : isbn) : payload =
+    List.filter (fun (k', _, _) -> k' <> k) payload
+
+  let upsert_precondition (payload : payload) (k : isbn) (n : int) (alpha : unique_tag) (r : payload) : payload =
+    let r_set = List.filter (fun (k', _, _) -> k' = k) r in
+    let union = List.concat [payload; r_set; [(k, n, alpha)]] in
+    List.sort_uniq compare union
+
+  let remove_elements_observed_at_source (payload : payload) (r : payload) : payload =
+    List.filter (fun x -> not (List.mem x r)) payload
+end
