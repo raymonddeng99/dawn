@@ -10,8 +10,14 @@ Op-based require delivery order exists and concurrent updates commute
 
 package main
 
-import "fmt"
-import "sync/atomic"
+import (
+    "crypto/sha1"
+    "fmt"
+    "sync/atomic"
+    "math/rand"
+    "sort"
+    "strings"
+)
 
 type Operation int
 
@@ -302,12 +308,12 @@ type MVRegisterValue struct {
 }
 
 type MVRegister struct {
-    payload []MVRegisterValue
+    ORCartPayload []MVRegisterValue
 }
 
 func NewMVRegister() *MVRegister {
     return &MVRegister{
-        payload: []MVRegisterValue{
+        ORCartPayload: []MVRegisterValue{
             {x: nil, v: []int64{}},
         },
     }
@@ -315,7 +321,7 @@ func NewMVRegister() *MVRegister {
 
 func (r *MVRegister) QueryIncrementVV(processID int) []int64 {
     maxVersion := int64(0)
-    for _, entry := range r.payload {
+    for _, entry := range r.ORCartPayload {
         for _, v := range entry.v {
             if v > maxVersion {
                 maxVersion = v
@@ -324,7 +330,7 @@ func (r *MVRegister) QueryIncrementVV(processID int) []int64 {
     }
     maxVersion++
 
-    newVersion := make([]int64, len(r.payload))
+    newVersion := make([]int64, len(r.ORCartPayload))
     for i := range newVersion {
         newVersion[i] = maxVersion
     }
@@ -336,17 +342,17 @@ func (r *MVRegister) QueryIncrementVV(processID int) []int64 {
 func (r *MVRegister) UpdateAssign(set_r []interface{}, processID int) {
     newVersion := r.QueryIncrementVV(processID)
     for _, x := range set_r {
-        r.payload = append(r.payload, MVRegisterValue{x: x, v: newVersion})
+        r.ORCartPayload = append(r.ORCartPayload, MVRegisterValue{x: x, v: newVersion})
     }
 }
 
 func (r *MVRegister) QueryValue() []MVRegisterValue {
-    return r.payload
+    return r.ORCartPayload
 }
 
 func (r *MVRegister) Compare(other *MVRegister) bool {
-    for _, entryA := range r.payload {
-        for _, entryB := range other.payload {
+    for _, entryA := range r.ORCartPayload {
+        for _, entryB := range other.ORCartPayload {
             if entryA.x == entryB.x {
                 for _, vA := range entryA.v {
                     if allLessThan(vA, entryB.v) {
@@ -370,9 +376,9 @@ func allLessThan(val int64, arr []int64) bool {
 
 func (r *MVRegister) Merge(other *MVRegister) *MVRegister {
     merged := NewMVRegister()
-    for _, entryA := range r.payload {
+    for _, entryA := range r.ORCartPayload {
         include := false
-        for _, entryB := range other.payload {
+        for _, entryB := range other.ORCartPayload {
             if entryA.x == entryB.x {
                 if !allLessThan(entryB.v[len(entryB.v)-1], entryA.v) || anyLessThan(entryA.v, entryB.v) {
                     include = true
@@ -381,13 +387,13 @@ func (r *MVRegister) Merge(other *MVRegister) *MVRegister {
             }
         }
         if include {
-            merged.payload = append(merged.payload, entryA)
+            merged.ORCartPayload = append(merged.ORCartPayload, entryA)
         }
     }
 
-    for _, entryB := range other.payload {
+    for _, entryB := range other.ORCartPayload {
         include := false
-        for _, entryA := range r.payload {
+        for _, entryA := range r.ORCartPayload {
             if entryB.x == entryA.x {
                 if !allLessThan(entryA.v[len(entryA.v)-1], entryB.v) || anyLessThan(entryB.v, entryA.v) {
                     include = true
@@ -396,7 +402,7 @@ func (r *MVRegister) Merge(other *MVRegister) *MVRegister {
             }
         }
         if include {
-            merged.payload = append(merged.payload, entryB)
+            merged.ORCartPayload = append(merged.ORCartPayload, entryB)
         }
     }
 
@@ -1148,4 +1154,114 @@ func ContSeqRemove(root *ContSeqNode, id Identifier) *ContSeqNode {
     }
 
     return root
+}
+
+
+// Op-based observed-remove shopping cart
+
+type ISBN string
+type UniqueTag string
+type ORCartPayload []struct {
+    isbn       ISBN
+    quantity   int
+    uniqueTag  UniqueTag
+}
+
+func EmptyORCartPayload() ORCartPayload {
+    return ORCartPayload{}
+}
+
+func (p ORCartPayload) GetQuantity(k ISBN) int {
+    var total int
+    for _, item := range p {
+        if item.isbn == k {
+            total += item.quantity
+        }
+    }
+    return total
+}
+
+func (p ORCartPayload) Add(k ISBN, n int) ORCartPayload {
+    existing := p.GetQuantity(k)
+    newTag := generateUniqueTag()
+    newItem := struct {
+        isbn      ISBN
+        quantity  int
+        uniqueTag UniqueTag
+    }{k, n + existing, newTag}
+
+    var newORCartPayload ORCartPayload
+    for _, item := range p {
+        if item.isbn != k {
+            newORCartPayload = append(newORCartPayload, item)
+        }
+    }
+    newORCartPayload = append(newORCartPayload, newItem)
+    return newORCartPayload
+}
+
+func (p ORCartPayload) Remove(k ISBN) ORCartPayload {
+    var newORCartPayload ORCartPayload
+    for _, item := range p {
+        if item.isbn != k {
+            newORCartPayload = append(newORCartPayload, item)
+        }
+    }
+    return newORCartPayload
+}
+
+func (p ORCartPayload) Downstream() {
+    for _, item := range p {
+        fmt.Printf("add(%s, %d, %s) has been delivered\n", item.isbn, item.quantity, item.uniqueTag)
+    }
+}
+
+func (p ORCartPayload) UpsertPrecondition(k ISBN, n int, alpha UniqueTag, r ORCartPayload) ORCartPayload {
+    rSet := make(ORCartPayload, 0)
+    for _, item := range r {
+        if item.isbn == k {
+            rSet = append(rSet, item)
+        }
+    }
+
+    union := append(append(p, rSet...), struct {
+        isbn      ISBN
+        quantity  int
+        uniqueTag UniqueTag
+    }{k, n, alpha})
+
+    sort.Slice(union, func(i, j int) bool {
+        return strings.Compare(string(union[i].isbn), string(union[j].isbn)) < 0
+    })
+
+    var uniqueUnion ORCartPayload
+    for i := range union {
+        if i == 0 || union[i] != union[i-1] {
+            uniqueUnion = append(uniqueUnion, union[i])
+        }
+    }
+    return uniqueUnion
+}
+
+func (p ORCartPayload) RemoveElementsObservedAtSource(r ORCartPayload) ORCartPayload {
+    var newORCartPayload ORCartPayload
+    for _, item := range p {
+        found := false
+        for _, rItem := range r {
+            if item == rItem {
+                found = true
+                break
+            }
+        }
+        if !found {
+            newORCartPayload = append(newORCartPayload, item)
+        }
+    }
+    return newORCartPayload
+}
+
+func generateUniqueTag() UniqueTag {
+    bytes := make([]byte, 8)
+    rand.Read(bytes)
+    return UniqueTag(sha1.Sum(bytes))
 }
