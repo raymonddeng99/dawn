@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::cmp::Eq;
+use rand::Rng;
+use sha1::{Digest, Sha1};
 
 enum Operation {
     Increment,
@@ -1008,5 +1010,87 @@ mod cont_sequence {
             self.right_child = self.right_child.as_mut().and_then(|node| node.remove(id));
             Some(self.to_owned())
         }
+    }
+}
+
+
+// Op-based observed-remove shopping cart
+mod orcart {
+    type ISBN = String;
+    type UniqueTag = String;
+    type Payload = Vec<(ISBN, i32, UniqueTag)>;
+
+    pub fn empty_payload() -> Payload {
+        vec![]
+    }
+
+    pub fn get_quantity(payload: &Payload, k: &ISBN) -> i32 {
+        payload
+            .iter()
+            .filter(|(isbn, _, _)| isbn == k)
+            .map(|(_, quantity, _)| quantity)
+            .sum()
+    }
+
+    pub fn add(payload: &Payload, k: &ISBN, n: i32) -> Payload {
+        let existing_quantity = get_quantity(payload, k);
+        let new_unique_tag = generate_unique_tag();
+        let mut new_payload = payload
+            .iter()
+            .filter(|(isbn, _, _)| isbn != k)
+            .cloned()
+            .collect::<Vec<_>>();
+        new_payload.push((k.clone(), n + existing_quantity, new_unique_tag));
+        new_payload
+    }
+
+    pub fn remove(payload: &Payload, k: &ISBN) -> Payload {
+        payload
+            .iter()
+            .filter(|(isbn, _, _)| isbn != k)
+            .cloned()
+            .collect()
+    }
+
+    pub fn downstream(payload: &Payload) {
+        for (k, n, u) in payload {
+            println!("add({}, {}, {}) has been delivered", k, n, u);
+        }
+    }
+
+    pub fn upsert_precondition(
+        payload: &Payload,
+        k: &ISBN,
+        n: i32,
+        alpha: &UniqueTag,
+        r: &Payload,
+    ) -> Payload {
+        let r_set = r
+            .iter()
+            .filter(|(isbn, _, _)| isbn == k)
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut union = payload.clone();
+        union.extend(r_set);
+        union.push((k.clone(), n, alpha.clone()));
+        union.sort_unstable();
+        union.dedup();
+        union
+    }
+
+    pub fn remove_elements_observed_at_source(payload: &Payload, r: &Payload) -> Payload {
+        let r_set: HashSet<_> = r.iter().cloned().collect();
+        payload
+            .iter()
+            .filter(|item| !r_set.contains(item))
+            .cloned()
+            .collect()
+    }
+
+    fn generate_unique_tag() -> UniqueTag {
+        let mut rng = rand::thread_rng();
+        let bytes: Vec<u8> = (0..8).map(|_| rng.gen()).collect();
+        let hash = Sha1::digest(&bytes);
+        hash.as_slice().iter().map(|b| format!("{:02x}", b)).collect()
     }
 }
