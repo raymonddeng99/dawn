@@ -767,3 +767,67 @@ removePredecessor node@(Node left right data id) tree =
   case right of
        Leaf => tree
        Node _ _ _ _ => Node left (removePredecessor right tree) data id
+
+
+-- Op-based observed-remove shopping cart
+module ORCart
+
+import Data.List
+import Data.Strings
+import System.Random
+
+%default total
+
+public export
+record Payload where
+  constructor MkPayload
+  items : List (String, Int, String)
+
+public export
+emptyPayload : Payload
+emptyPayload = MkPayload []
+
+public export
+getQuantity : Payload -> String -> Int
+getQuantity (MkPayload items) k = sum $ map snd $ filter (\ (isbn, _, _) => isbn == k) items
+
+public export
+add : Payload -> String -> Int -> Payload
+add (MkPayload items) k n =
+  let existing_quantity = getQuantity (MkPayload items) k
+      new_unique_tag = generateUniqueTag
+   in MkPayload $
+        filter (\ (isbn, _, _) => isbn /= k) items ++
+        [(k, n + existing_quantity, new_unique_tag)]
+
+public export
+remove : Payload -> String -> Payload
+remove (MkPayload items) k =
+  MkPayload $ filter (\ (isbn, _, _) => isbn /= k) items
+
+public export
+downstream : Payload -> IO ()
+downstream (MkPayload items) =
+  traverse_ (\ (k, n, u) => putStrLn $ "add(" ++ k ++ ", " ++ show n ++ ", " ++ u ++ ") has been delivered") items
+
+public export
+upsertPrecondition : Payload -> String -> Int -> String -> Payload -> Payload
+upsertPrecondition (MkPayload items) k n alpha (MkPayload r) =
+  let r_set = filter (\ (isbn, _, _) => isbn == k) r
+      union = nubBy (\ (isbn, _, _) (isbn', _, _) => isbn == isbn') $
+              items ++ r_set ++ [(k, n, alpha)]
+   in MkPayload union
+
+public export
+removeElementsObservedAtSource : Payload -> Payload -> Payload
+removeElementsObservedAtSource (MkPayload items) (MkPayload r) =
+  MkPayload $ filter (\ item => not $ elem item r) items
+
+private
+generateUniqueTag : IO String
+generateUniqueTag = do
+  bytes <- randbytes 8
+  pure $ concatMap (\ b => pack (showHex b "")) bytes
+  where
+    pack : String -> String
+    pack = id
