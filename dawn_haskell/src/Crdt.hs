@@ -734,3 +734,49 @@ findSuccessor (Just node) =
     Nothing -> node
     Just left -> findSuccessor (Just left)
 findSuccessor Nothing = error "No successor found"
+
+
+
+-- Op-based observed-remove shopping cart
+module ORCart (
+    Payload,
+    emptyPayload,
+    getQuantity,
+    add,
+    remove,
+    upsertPrecondition,
+    removeElementsObservedAtSource
+) where
+
+import Data.List (sort, nub, delete, union)
+import Data.Digest.Pure.SHA (sha1, bytestringDigest)
+import Data.ByteString.Char8 (pack)
+import System.Random (randomIO)
+
+type ISBN = String
+type UniqueTag = String
+type Payload = [(ISBN, Int, UniqueTag)]
+
+emptyPayload :: Payload
+emptyPayload = []
+
+getQuantity :: Payload -> ISBN -> Int
+getQuantity payload k = sum [n | (k', n, _) <- payload, k' == k]
+
+add :: Payload -> ISBN -> Int -> Payload
+add payload k n = let
+    existingQuantity = getQuantity payload k
+    newUniqueTag = sha1 . bytestringDigest . pack . show =<< randomIO
+    in (k, n + existingQuantity, newUniqueTag) : filter (\(k', _, _) -> k' /= k) payload
+
+remove :: Payload -> ISBN -> Payload
+remove payload k = filter (\(k', _, _) -> k' /= k) payload
+
+upsertPrecondition :: Payload -> ISBN -> Int -> UniqueTag -> Payload -> Payload
+upsertPrecondition payload k n alpha r =
+    let rSet = filter (\(k', _, _) -> k' == k) r
+        union' = payload `union` rSet `union` [(k, n, alpha)]
+    in sort $ nub union'
+
+removeElementsObservedAtSource :: Payload -> Payload -> Payload
+removeElementsObservedAtSource payload r = filter (`notElem` r) payload
