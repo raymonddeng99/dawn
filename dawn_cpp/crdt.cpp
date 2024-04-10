@@ -963,3 +963,96 @@ private:
         return current;
     }
 };
+
+
+// Op-based observed-remove shopping cart
+class ORCart {
+private:
+    using ISBN = std::string;
+    using UniqueTag = std::string;
+    using Payload = std::vector<std::tuple<ISBN, int, UniqueTag>>;
+
+    static UniqueTag generateUniqueTag() {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        static std::uniform_int_distribution<> dis(0, 255);
+
+        std::string tag(8, ' ');
+        std::generate(tag.begin(), tag.end(), std::bind(dis, std::ref(gen)));
+        return tag;
+    }
+
+public:
+    static Payload emptyPayload() {
+        return Payload();
+    }
+
+    static int getQuantity(const Payload& payload, const ISBN& k) {
+        int total = 0;
+        for (const auto& [isbn, quantity, _] : payload) {
+            if (isbn == k) {
+                total += quantity;
+            }
+        }
+        return total;
+    }
+
+    static Payload add(const Payload& payload, const ISBN& k, int n) {
+        Payload newPayload;
+        int existingQuantity = getQuantity(payload, k);
+        UniqueTag newTag = generateUniqueTag();
+        for (const auto& item : payload) {
+            const auto& [isbn, quantity, tag] = item;
+            if (isbn != k) {
+                newPayload.emplace_back(isbn, quantity, tag);
+            }
+        }
+        newPayload.emplace_back(k, n + existingQuantity, newTag);
+        return newPayload;
+    }
+
+    static Payload remove(const Payload& payload, const ISBN& k) {
+        Payload newPayload;
+        for (const auto& item : payload) {
+            const auto& [isbn, quantity, tag] = item;
+            if (isbn != k) {
+                newPayload.emplace_back(isbn, quantity, tag);
+            }
+        }
+        return newPayload;
+    }
+
+    static void downstream(const Payload& payload) {
+        for (const auto& [isbn, quantity, tag] : payload) {
+            std::cout << "add(" << isbn << ", " << quantity << ", " << tag << ") has been delivered" << std::endl;
+        }
+    }
+
+    static Payload upsertPrecondition(const Payload& payload, const ISBN& k, int n, const UniqueTag& alpha, const Payload& r) {
+        Payload rSet;
+        for (const auto& item : r) {
+            const auto& [isbn, _, _] = item;
+            if (isbn == k) {
+                rSet.push_back(item);
+            }
+        }
+
+        Payload union_ = payload;
+        union_.insert(union_.end(), rSet.begin(), rSet.end());
+        union_.emplace_back(k, n, alpha);
+        std::sort(union_.begin(), union_.end());
+        union_.erase(std::unique(union_.begin(), union_.end()), union_.end());
+        return union_;
+    }
+
+    static Payload removeElementsObservedAtSource(const Payload& payload, const Payload& r) {
+        std::unordered_set<std::tuple<ISBN, int, UniqueTag>> rSet(r.begin(), r.end());
+        Payload newPayload;
+        for (const auto& item : payload) {
+            if (rSet.find(item) == rSet.end()) {
+                newPayload.push_back(item);
+            }
+        }
+        return newPayload;
+    }
+};
