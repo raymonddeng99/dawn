@@ -10,6 +10,8 @@ Op-based require delivery order exists and concurrent updates commute
 from enum import Enum
 from typing import List, Set, Tuple, Dict, Callable, TypeVar, Generic
 from threading import Lock
+import random
+import hashlib
 
 class Operation(Enum):
     Increment = 1
@@ -101,14 +103,12 @@ class PNCounter:
     def value(self):
         return sum(self.p) - sum(self.n)
 
-    @staticmethod
     def compare(x, y):
         for i in range(len(x.p)):
             if x.p[i] > y.p[i] or x.n[i] > y.n[i]:
                 return False
         return True
 
-    @staticmethod
     def merge(x, y):
         z = PNCounter(len(x.p))
         for i in range(len(x.p)):
@@ -647,3 +647,40 @@ class ContSeq:
         if node.left_child is None:
             return node
         return self.find_successor(node.left_child)
+
+
+# Op-based observed-remove shopping cart
+class ORCart:
+    ISBN = str
+    UniqueTag = str
+    Payload = List[Tuple[ISBN, int, UniqueTag]]
+
+    def generate_unique_tag() -> UniqueTag:
+        random_bytes = bytes(random.getrandbits(8) for _ in range(8))
+        return hashlib.sha1(random_bytes).hexdigest()
+
+    def empty_payload() -> Payload:
+        return []
+
+    def get_quantity(payload: Payload, k: ISBN) -> int:
+        return sum(n for isbn, n, _ in payload if isbn == k)
+
+    def add(payload: Payload, k: ISBN, n: int) -> Payload:
+        existing_quantity = ORCart.get_quantity(payload, k)
+        new_unique_tag = ORCart.generate_unique_tag()
+        new_payload = [(isbn, quantity, tag) for isbn, quantity, tag in payload if isbn != k]
+        new_payload.append((k, n + existing_quantity, new_unique_tag))
+        return new_payload
+
+    def remove(payload: Payload, k: ISBN) -> Payload:
+        return [(isbn, quantity, tag) for isbn, quantity, tag in payload if isbn != k]
+
+    def upsert_precondition(payload: Payload, k: ISBN, n: int, alpha: UniqueTag, r: Payload) -> Payload:
+        r_set = [(isbn, quantity, tag) for isbn, quantity, tag in r if isbn == k]
+        union = payload + r_set + [(k, n, alpha)]
+        union.sort(key=lambda x: x[:2])
+        return list(dict.fromkeys(union))
+
+    def remove_elements_observed_at_source(payload: Payload, r: Payload) -> Payload:
+        r_set = set(r)
+        return [item for item in payload if item not in r_set]
