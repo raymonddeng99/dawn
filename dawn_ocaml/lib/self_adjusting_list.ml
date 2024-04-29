@@ -1,5 +1,6 @@
 open Base
 
+(* Sleator-Tarjan one-finger model *)
 module SelfAdjustingList = struct
   type 'a node = {
     mutable prev : 'a node option;
@@ -59,4 +60,74 @@ module SelfAdjustingList = struct
             end
         | Some found_node -> Some found_node
         end
+end
+
+(* Constant finger model *)
+module ConstList = struct
+  type 'a node = {
+    value: 'a;
+    mutable next: 'a node option;
+  }
+
+  type 'a t = {
+    mutable head: 'a node option;
+    mutable fingers: ('a node option) array;
+  }
+
+  let create num_fingers =
+    let fingers = Array.make num_fingers None in
+    { head = None; fingers }
+
+  let rec find_and_move list x =
+    match list.head with
+    | None -> None
+    | Some head ->
+        if head.value = x then (
+          list.head <- head.next;
+          head.next <- list.head;
+          Array.fill list.fingers 0 (Array.length list.fingers) (Some head);
+          Some head)
+        else
+          match find_and_move_helper list.fingers head x with
+          | Some node ->
+              let finger_idx = ref 0 in
+              while !finger_idx < Array.length list.fingers && list.fingers.(!finger_idx) <> Some node do
+                incr finger_idx
+              done;
+              if !finger_idx < Array.length list.fingers then
+                list.fingers.(!finger_idx) <- node.next;
+              Some node
+          | None -> None
+
+  and find_and_move_helper fingers node x =
+    match node.next with
+    | None -> None
+    | Some next ->
+        if next.value = x then (
+          node.next <- next.next;
+          next.next <- list.head;
+          Array.fill fingers 0 (Array.length fingers) (Some next);
+          list.head <- Some next;
+          Some next)
+        else
+          match find_and_move_helper fingers next x with
+          | Some found_node -> Some found_node
+          | None ->
+              let finger_idx = ref 0 in
+              while !finger_idx < Array.length fingers && fingers.(!finger_idx) <> Some node do
+                incr finger_idx
+              done;
+              if !finger_idx < Array.length fingers then
+                fingers.(!finger_idx) <- node.next;
+              find_and_move_helper fingers next x
+
+  let find list x =
+    match find_and_move list x with
+    | Some node -> Some node.value
+    | None -> None
+
+  let add list x =
+    let new_node = { value = x; next = list.head } in
+    list.head <- Some new_node;
+    Array.fill list.fingers 0 (Array.length list.fingers) (Some new_node)
 end
