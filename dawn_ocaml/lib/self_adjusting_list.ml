@@ -131,3 +131,79 @@ module ConstList = struct
     list.head <- Some new_node;
     Array.fill list.fingers 0 (Array.length list.fingers) (Some new_node)
 end
+
+(* Order by Next Request strategy *)
+module OBNRList = struct
+  type 'a node = {
+    mutable value : 'a;
+    mutable next : 'a node option;
+    mutable prev : 'a node option;
+  }
+
+  type 'a list = {
+    mutable head : 'a node option;
+    mutable tail : 'a node option;
+  }
+
+  let create () = { head = None; tail = None }
+
+  let insert list value =
+    let new_node = { value; next = None; prev = None } in
+    match list.head with
+    | None ->
+      list.head <- Some new_node;
+      list.tail <- Some new_node
+    | Some head ->
+      new_node.next <- list.head;
+      head.prev <- Some new_node;
+      list.head <- Some new_node
+
+  let remove_head list =
+    match list.head with
+    | None -> None
+    | Some node ->
+      let value = node.value in
+      list.head <- node.next;
+      (match node.next with
+       | None -> list.tail <- None
+       | Some next -> next.prev <- None);
+      Some value
+
+  let access list value =
+    let rec find_node node =
+      match node with
+      | None -> None
+      | Some { value = v; next; prev } ->
+        if v = value then
+          (match prev with
+           | None -> ()
+           | Some prev ->
+             prev.next <- next;
+             (match next with
+              | None -> ()
+              | Some next -> next.prev <- Some prev))
+        else
+          find_node next
+    in
+    let rec move_to_front node =
+      match node with
+      | None -> ()
+      | Some node ->
+        (match node.prev with
+         | None -> ()
+         | Some prev ->
+           prev.next <- node.next;
+           (match node.next with
+            | None -> list.tail <- Some prev
+            | Some next -> next.prev <- Some prev);
+           node.prev <- None;
+           node.next <- list.head;
+           (match list.head with
+            | None -> list.tail <- Some node
+            | Some head -> head.prev <- Some node);
+           list.head <- Some node)
+    in
+    match find_node list.head with
+    | None -> ()
+    | Some node -> move_to_front (Some node)
+end
