@@ -123,3 +123,71 @@ func (list *ConstList) Find(target interface{}) *Node {
 	}
 	return found
 }
+
+
+// Order by Next Request strategy
+type ONBRList[T any] struct {
+	head *Node[T]
+	tail *Node[T]
+}
+
+func (l *ONBRList[T]) Insert(value T) {
+	newNode := &Node[T]{value: value, next: l.head, prev: nil}
+	if l.head != nil {
+		l.head.prev = newNode
+	} else {
+		l.tail = newNode
+	}
+	l.head = newNode
+}
+
+func (l *ONBRList[T]) RemoveHead() (T, bool) {
+	if l.head == nil {
+		var zero T
+		return zero, false
+	}
+	value := l.head.value
+	l.head = l.head.next
+	if l.head != nil {
+		l.head.prev = nil
+	} else {
+		l.tail = nil
+	}
+	return value, true
+}
+
+func (l *ONBRList[T]) Access(value T) {
+	node := l.find(value)
+	if node != nil {
+		l.moveToFront(node)
+	}
+}
+
+func (l *ONBRList[T]) find(value T) *Node[T] {
+	curr := l.head
+	for curr != nil {
+		if curr.value == value {
+			return curr
+		}
+		curr = curr.next
+	}
+	return nil
+}
+
+func (l *ONBRList[T]) moveToFront(node *Node[T]) {
+	if node == l.head {
+		return
+	}
+	if node.prev != nil {
+		node.prev.next = node.next
+	} else {
+		l.tail = node.next
+	}
+	if node.next != nil {
+		node.next.prev = node.prev
+	}
+	node.prev = nil
+	node.next = l.head
+	l.head.prev = node
+	l.head = node
+}
