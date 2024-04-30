@@ -121,3 +121,34 @@ find x (MkConstList h t f) =
                                   Nothing => Nothing
                                   Just hd => traverseFromFinger x (MkConstList h t f) (Just hd)
                      found => found
+
+
+-- Order by Next Request strategy
+module OBNRList
+
+data Node : Type -> Type where
+  MkNode : (value : a) -> (next : Maybe (Node a)) -> (prev : Maybe (Node a)) -> Node a
+
+data SelfAdjustingList : Type -> Type where
+  MkSelfAdjustingList : (head : Maybe (Node a)) -> (tail : Maybe (Node a)) -> SelfAdjustingList a
+
+empty : SelfAdjustingList a
+empty = MkSelfAdjustingList Nothing Nothing
+
+insert : a -> SelfAdjustingList a -> SelfAdjustingList a
+insert val (MkSelfAdjustingList head tail) =
+  let newNode = MkNode val head Nothing in
+  case head of
+    Nothing => MkSelfAdjustingList (Just newNode) (Just newNode)
+    Just h => let h' = record { prev = Just newNode } h in
+              MkSelfAdjustingList (Just newNode) tail
+
+removeHead : SelfAdjustingList a -> Maybe (a, SelfAdjustingList a)
+removeHead (MkSelfAdjustingList Nothing _) = Nothing
+removeHead (MkSelfAdjustingList (Just h) t) =
+  let updateTail : Maybe (Node a) -> Maybe (Node a)
+      updateTail Nothing = Nothing
+      updateTail (Just n) = Just (record { prev = Nothing } n) in
+  Just (value h, MkSelfAdjustingList (next h) (updateTail t))
+
+access : Eq a => a -> SelfAdjustingList a -> SelfAdjustingList
