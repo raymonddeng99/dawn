@@ -101,3 +101,46 @@ find x list@(SelfAdjustingList h t f) =
         Nothing -> Nothing
         Just hd -> traverseFromFinger x list hd
       found -> found
+
+
+-- Order by Next Request strategy
+module OBNRList (SelfAdjustingList, empty, insert, removeHead, access) where
+
+data Node a = Node { value :: a, next :: Maybe (Node a), prev :: Maybe (Node a) } deriving (Show)
+data SelfAdjustingList a = SelfAdjustingList { head :: Maybe (Node a), tail :: Maybe (Node a) } deriving (Show)
+
+empty :: SelfAdjustingList a
+empty = SelfAdjustingList Nothing Nothing
+
+insert :: a -> SelfAdjustingList a -> SelfAdjustingList a
+insert val list = SelfAdjustingList (Just newNode) (case head (list) of
+                                                     Nothing -> Just newNode
+                                                     Just h -> tail list)
+  where newNode = Node val (head list) Nothing
+        updatePrev (Just n) = n { prev = Just newNode }
+        updatePrev Nothing = Nothing
+
+removeHead :: SelfAdjustingList a -> Maybe (a, SelfAdjustingList a)
+removeHead (SelfAdjustingList Nothing _) = Nothing
+removeHead (SelfAdjustingList (Just h) t) = Just (value h, SelfAdjustingList (next h) (updateTail t))
+  where updateTail Nothing = Nothing
+        updateTail (Just n) = Just (n { prev = Nothing })
+
+access :: Eq a => a -> SelfAdjustingList a -> SelfAdjustingList a
+access val list = moveToFront $ findNode val list
+  where findNode val (SelfAdjustingList Nothing _) = Nothing
+        findNode val (SelfAdjustingList (Just h) t) =
+          if value h == val
+            then Just h
+            else findNode val (SelfAdjustingList (next h) t)
+        moveToFront Nothing = list
+        moveToFront (Just n) = SelfAdjustingList (Just n) (updateTail list)
+          where updateTail (SelfAdjustingList _ Nothing) = tail list
+                updateTail (SelfAdjustingList h (Just t)) = SelfAdjustingList (next n) (Just t)
+                updatePrev (Just p) = p { next = next n }
+                updatePrev Nothing = Nothing
+                updateNext (Just n') = n' { prev = prev n }
+                updateNext Nothing = Nothing
+                (Just h') = head list
+                h' { prev = Just n } = h'
+                n { next = Just h', prev = Nothing } = n
