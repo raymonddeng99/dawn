@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <optional>
 
 template <typename T>
 struct Node {
@@ -127,5 +128,80 @@ public:
             return traverseFromFinger(target, head);
         }
         return found;
+    }
+};
+
+
+// Order by Next Request strategy
+template <typename T>
+class ONBRList {
+private:
+    Node<T>* head;
+    Node<T>* tail;
+
+public:
+    ONBRList() : head(nullptr), tail(nullptr) {}
+
+    ~ONBRList() {
+        Node<T>* curr = head;
+        while (curr != nullptr) {
+            Node<T>* next = curr->next;
+            delete curr;
+            curr = next;
+        }
+    }
+
+    void insert(const T& value) {
+        Node<T>* newNode = new Node<T>(value);
+        if (head == nullptr) {
+            head = newNode;
+            tail = newNode;
+        } else {
+            newNode->next = head;
+            head->prev = newNode;
+            head = newNode;
+        }
+    }
+
+    std::optional<T> remove_head() {
+        if (head == nullptr) {
+            return std::nullopt;
+        }
+        T value = head->value;
+        Node<T>* oldHead = head;
+        head = head->next;
+        if (head != nullptr) {
+            head->prev = nullptr;
+        } else {
+            tail = nullptr;
+        }
+        delete oldHead;
+        return value;
+    }
+
+    void access(const T& value) {
+        Node<T>* curr = head;
+        Node<T>* prev = nullptr;
+        while (curr != nullptr) {
+            if (curr->value == value) {
+                if (prev == nullptr) {
+                    // Value is already at the head
+                    return;
+                }
+                prev->next = curr->next;
+                if (curr->next != nullptr) {
+                    curr->next->prev = prev;
+                } else {
+                    tail = prev;
+                }
+                curr->next = head;
+                head->prev = curr;
+                head = curr;
+                curr->prev = nullptr;
+                return;
+            }
+            prev = curr;
+            curr = curr->next;
+        }
     }
 };
