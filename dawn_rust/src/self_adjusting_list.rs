@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::LinkedList;
 
 type Link<T> = Option<Rc<RefCell<Node<T>>>>;
 
@@ -138,5 +139,45 @@ impl<T: PartialEq + Clone> ConstList<T> {
         }
 
         self.traverse_from_finger(|data| data == &target)
+    }
+}
+
+// Order by Next Request strategy
+struct ONBRList<T> {
+    list: LinkedList<T>,
+}
+
+impl<T: PartialEq + Clone> ONBRList<T> {
+    fn new() -> Self {
+        ONBRList {
+            list: LinkedList::new(),
+        }
+    }
+
+    fn insert(&mut self, value: T) {
+        self.list.push_front(value);
+    }
+
+    fn remove_head(&mut self) -> Option<T> {
+        self.list.pop_front()
+    }
+
+    fn access(&mut self, value: &T) {
+        let mut prev = None;
+        let mut curr = self.list.front_mut();
+
+        while let Some(node) = curr {
+            if node == value {
+                if let Some(prev_node) = prev.take() {
+                    prev_node.next = node.next.take();
+                } else {
+                    self.list.pop_front();
+                }
+                self.list.push_front(node.clone());
+                break;
+            }
+            prev = Some(curr);
+            curr = node.next.as_mut();
+        }
     }
 }
