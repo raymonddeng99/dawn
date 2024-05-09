@@ -1,4 +1,5 @@
 from typing import Generic, TypeVar, List, Tuple, Optional
+import heapq
 
 T = TypeVar('T')
 
@@ -90,3 +91,37 @@ class Deque(Generic[T]):
             x = node[-1]
             self.back.append(node[:-1])
         return x
+
+
+# Partially retroactive priority queue
+class PriorityQueue:
+    def __init__(self):
+        self.data = []
+        self.time = 0
+        self.retrodata = []
+
+    def is_empty(self):
+        return len(self.data) == 0
+
+    def insert(self, x):
+        self.time += 1
+        heapq.heappush(self.data, (self.time, x))
+
+    def find_min(self):
+        if self.is_empty():
+            return None
+        else:
+            return self.data[0][1]
+
+    def delete_min(self):
+        if self.is_empty():
+            return None
+        else:
+            min_val = heapq.heappop(self.data)[1]
+            return min_val
+
+    def retroactive_update(self, t, x):
+        self.retrodata = [(self.data[i][0], x) if self.data[i][0] <= t else self.data[i] for i in range(len(self.data))]
+        self.data = self.retrodata
+        heapq.heapify(self.data)
+        self.retrodata = []
