@@ -1,4 +1,5 @@
 use std::mem;
+use std::collections::BinaryHeap;
 
 enum Node<T> {
     One(T),
@@ -115,5 +116,62 @@ impl<T: Clone> Deque<T> {
         };
         self.back = new_back;
         Some(x)
+    }
+}
+
+
+// Partially retroactive priority queue
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Item<T> {
+    value: T,
+    priority: usize,
+}
+
+pub struct PriorityQueue<T> {
+    data: BinaryHeap<Item<T>>,
+    time: usize,
+}
+
+impl<T: Ord> PriorityQueue<T> {
+    pub fn new() -> Self {
+        PriorityQueue {
+            data: BinaryHeap::new(),
+            time: 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    pub fn insert(&mut self, x: T) {
+        self.time += 1;
+        self.data.push(Item {
+            value: x,
+            priority: self.time,
+        });
+    }
+
+    pub fn find_min(&self) -> Option<&T> {
+        self.data.peek().map(|item| &item.value)
+    }
+
+    pub fn delete_min(&mut self) -> Option<T> {
+        self.data.pop().map(|item| item.value)
+    }
+
+    pub fn retroactive_update(&mut self, t: usize, x: T) {
+        let mut new_data = BinaryHeap::new();
+        for item in self.data.iter() {
+            if item.priority <= t {
+                new_data.push(Item {
+                    value: x.clone(),
+                    priority: item.priority,
+                });
+            } else {
+                new_data.push(item.clone());
+            }
+        }
+        self.data = new_data;
     }
 }
