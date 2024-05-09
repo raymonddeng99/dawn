@@ -1,6 +1,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <queue>
+#include <utility>
 
 template <typename T>
 class Deque {
@@ -129,5 +131,51 @@ public:
             back.back() = std::make_tuple(std::get<0>(*p), std::get<1>(*p), std::get<2>(*p));
         }
         return x;
+    }
+};
+
+
+// Partially retroactive priority queue
+template <typename T>
+class PriorityQueue {
+private:
+    std::priority_queue<std::pair<int, T>, std::vector<std::pair<int, T>>, std::greater<std::pair<int, T>>> pq;
+    int time;
+
+public:
+    PriorityQueue() : time(0) {}
+
+    bool isEmpty() const {
+        return pq.empty();
+    }
+
+    void insert(const T& x) {
+        time++;
+        pq.emplace(time, x);
+    }
+
+    T findMin() const {
+        return pq.top().second;
+    }
+
+    T deleteMin() {
+        T result = pq.top().second;
+        pq.pop();
+        return result;
+    }
+
+    void retroactiveUpdate(int t, const T& x) {
+        std::priority_queue<std::pair<int, T>, std::vector<std::pair<int, T>>, std::greater<std::pair<int, T>>> newPq;
+        while (!pq.empty()) {
+            int priority = pq.top().first;
+            T value = pq.top().second;
+            pq.pop();
+            if (priority <= t) {
+                newPq.emplace(priority, x);
+            } else {
+                newPq.emplace(priority, value);
+            }
+        }
+        std::swap(pq, newPq);
     }
 };
