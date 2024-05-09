@@ -96,3 +96,39 @@ end = struct
     | None -> None
     | Some x -> Some (x, { front = front'; rear })
 end
+
+(* Partially retroactive priority queue *)
+module PriorityQueue = struct
+  type 'a t = {
+    data: ('a * int) list;
+    mutable time: int;
+  }
+
+  exception Empty
+
+  let create () = { data = []; time = 0 }
+
+  let is_empty q = q.data = []
+
+  let insert q x =
+    q.time <- q.time + 1;
+    q.data <- (x, q.time) :: q.data
+
+  let find_min q =
+    if is_empty q then
+      raise Empty
+    else
+      List.hd (List.sort (fun (_, t1) (_, t2) -> compare t1 t2) q.data)
+
+  let delete_min q =
+    if is_empty q then
+      raise Empty
+    else
+      let (min_val, _) = find_min q in
+      q.data <- List.filter (fun (x, _) -> x <> min_val) q.data;
+      min_val
+
+  let retroactive_update q t x =
+    let data' = List.map (fun (v, t') -> if t' <= t then (x, t') else (v, t')) q.data in
+    { q with data = data' }
+end
