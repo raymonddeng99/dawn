@@ -98,3 +98,46 @@ takeBack (Deque front (Four w x y z : rear')) =
         Three x y z : front'' -> reverse (One z : Two y x : One w : front'')
         Four w' x' y' z' : front'' -> reverse (Three z' y' x' : front'')
   in (Just z, Deque front' rear')
+
+
+-- Partially retroactive priority queue
+module PriorityQueue (
+  PQueue,
+  create,
+  isEmpty,
+  insert,
+  findMin,
+  deleteMin,
+  retroactiveUpdate
+) where
+
+import Data.List (sort, sortBy)
+import Data.Ord (comparing)
+
+data PQueue a = PQueue [(a, Int)] Int deriving (Show)
+
+create :: PQueue a
+create = PQueue [] 0
+
+isEmpty :: PQueue a -> Bool
+isEmpty (PQueue [] _) = True
+isEmpty _              = False
+
+insert :: Ord a => PQueue a -> a -> PQueue a
+insert (PQueue data time) x = PQueue ((x, time + 1) : data) (time + 1)
+
+findMin :: Ord a => PQueue a -> Maybe a
+findMin (PQueue [])     = Nothing
+findMin (PQueue data _) = Just $ fst $ head $ sortBy (comparing snd) data
+
+deleteMin :: Ord a => PQueue a -> Maybe (PQueue a, a)
+deleteMin (PQueue [])     = Nothing
+deleteMin (PQueue data t) = Just (PQueue data' t, minVal)
+  where
+    (minVal, _) = head $ sortBy (comparing snd) data
+    data'       = filter (\(x, _) -> x /= minVal) data
+
+retroactiveUpdate :: Ord a => PQueue a -> Int -> a -> PQueue a
+retroactiveUpdate (PQueue data time) t x = PQueue data' time
+  where
+    data' = map (\(v, t') -> if t' <= t then (x, t') else (v, t')) data
