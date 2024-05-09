@@ -115,3 +115,56 @@ takeBack (MkDeque front (Four w x y z :: back')) =
                     Three x y z :: front'' => reverse (One z :: Two y x :: One w :: front'')
                     Four w' x' y' z' :: front'' => reverse (Three z' y' x' :: front'')
   in Just (z, MkDeque front' back')
+
+
+-- Partially retroactive priority queue
+module PriorityQueue
+
+import Data.Nat
+import Data.So
+
+%default total
+
+data PQueue : Type -> Type where
+  Nil : PQueue a
+  (::) : (Int, a) -> PQueue a -> PQueue a
+
+addTime : PQueue a -> PQueue a
+addTime Nil = Nil
+addTime ((t, x) :: xs) = (S t, x) :: addTime xs
+
+insert : Ord a => a -> PQueue a -> PQueue a
+insert x q = addTime ((0, x) :: q)
+
+isEmpty : PQueue a -> Bool
+isEmpty Nil = True
+isEmpty _   = False
+
+findMin : Ord a => PQueue a -> Maybe a
+findMin Nil                 = Nothing
+findMin ((t, x) :: xs)      = case getMin xs of
+                                   Nothing => Just x
+                                   Just (t', x') => if t < t' then Just x else Just x'
+  where
+    getMin : PQueue a -> Maybe (Int, a)
+    getMin Nil = Nothing
+    getMin ((t, x) :: xs) = case getMin xs of
+                                 Nothing => Just (t, x)
+                                 Just (t', x') => if t < t' then Just (t, x) else Just (t', x')
+
+deleteMin : Ord a => PQueue a -> (Maybe a, PQueue a)
+deleteMin Nil = (Nothing, Nil)
+deleteMin q  = case findMin q of
+                    Nothing => (Nothing, Nil)
+                    Just x  => (Just x, delete x q)
+  where
+    delete : Ord a => a -> PQueue a -> PQueue a
+    delete x Nil = Nil
+    delete x ((t, y) :: ys) = if x == y then delete x ys else (t, y) :: delete x ys
+
+retroactiveUpdate : Ord a => PQueue a -> Int -> a -> PQueue a
+retroactiveUpdate Nil _ _ = Nil
+retroactiveUpdate ((t, x) :: xs) t' x' = updateElem t t' x' :: retroactiveUpdate xs t' x'
+  where
+    updateElem : Int -> Int -> a -> (Int, a)
+    updateElem t t' x' = if t <= t' then (t, x') else (t, x)
