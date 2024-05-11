@@ -125,3 +125,51 @@ class PriorityQueue:
         self.data = self.retrodata
         heapq.heapify(self.data)
         self.retrodata = []
+
+
+
+# Simple Confluently Persistent Catenable Lists, Tarjan et al
+class Node:
+    def __init__(self, value, left=None, right=None):
+        self.value = value
+        self.left = left
+        self.right = right
+
+class PersistentList:
+    def __init__(self):
+        self.left = None
+        self.right = None
+
+    @staticmethod
+    def singleton(value):
+        node = Node(value)
+        return PersistentList(node, node)
+
+    def is_empty(self):
+        return self.left is None and self.right is None
+
+    def cons(self, value):
+        node = Node(value, None, self.left)
+        return PersistentList(node, self.right)
+
+    def head(self):
+        if self.left is not None:
+            return self.left.value
+        raise ValueError("Empty list")
+
+    def tail(self):
+        if self.left is self.right:
+            return PersistentList()
+        if self.right is not None:
+            return PersistentList(self.right.left, self.right.right)
+        raise ValueError("Empty list")
+
+    def catenate(self, other):
+        if self.right is other.left:
+            return PersistentList(self.left, other.right)
+        node = Node(None, self.right, other.left)
+        return PersistentList(self.left, other.right)
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
