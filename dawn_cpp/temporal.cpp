@@ -3,6 +3,7 @@
 #include <optional>
 #include <queue>
 #include <utility>
+#include <memory>
 
 template <typename T>
 class Deque {
@@ -178,4 +179,69 @@ public:
         }
         std::swap(pq, newPq);
     }
+};
+
+
+
+// Simple Confluently Persistent Catenable Lists, Tarjan et al
+template <typename T>
+class PersistentList {
+private:
+    struct Node {
+        T value;
+        std::shared_ptr<Node> left;
+        std::shared_ptr<Node> right;
+
+        Node(const T& value, const std::shared_ptr<Node>& left, const std::shared_ptr<Node>& right)
+            : value(value), left(left), right(right) {}
+    };
+
+    std::shared_ptr<Node> left;
+    std::shared_ptr<Node> right;
+
+public:
+    PersistentList() : left(nullptr), right(nullptr) {}
+
+    bool isEmpty() const {
+        return left == nullptr && right == nullptr;
+    }
+
+    static PersistentList singleton(const T& value) {
+        auto node = std::make_shared<Node>(value, nullptr, nullptr);
+        return PersistentList(node, node);
+    }
+
+    PersistentList cons(const T& value) const {
+        auto node = std::make_shared<Node>(value, nullptr, left);
+        return PersistentList(node, right);
+    }
+
+    T head() const {
+        if (left) {
+            return left->value;
+        }
+        throw std::logic_error("Empty list");
+    }
+
+    PersistentList tail() const {
+        if (left == right) {
+            return PersistentList();
+        }
+        if (right) {
+            return PersistentList(right->left, right->right);
+        }
+        throw std::logic_error("Empty list");
+    }
+
+    PersistentList catenate(const PersistentList& other) const {
+        if (right == other.left) {
+            return PersistentList(left, other.right);
+        }
+        auto node = std::make_shared<Node>(T(), right, other.left);
+        return PersistentList(left, other.right);
+    }
+
+private:
+    PersistentList(const std::shared_ptr<Node>& left, const std::shared_ptr<Node>& right)
+        : left(left), right(right) {}
 };

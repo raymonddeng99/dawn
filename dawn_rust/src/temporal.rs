@@ -1,5 +1,6 @@
 use std::mem;
 use std::collections::BinaryHeap;
+use std::rc::Rc;
 
 enum Node<T> {
     One(T),
@@ -173,5 +174,92 @@ impl<T: Ord> PriorityQueue<T> {
             }
         }
         self.data = new_data;
+    }
+}
+
+
+// Simple Confluently Persistent Catenable Lists, Tarjan et al
+type Link<T> = Option<Rc<Node<T>>>;
+
+struct Node<T> {
+    value: T,
+    left: Link<T>,
+    right: Link<T>,
+}
+
+pub struct PersistentList<T> {
+    left: Link<T>,
+    right: Link<T>,
+}
+
+impl<T> PersistentList<T> {
+    pub fn new() -> Self {
+        PersistentList { left: None, right: None }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.left.is_none() && self.right.is_none()
+    }
+
+    pub fn singleton(value: T) -> Self {
+        let node = Rc::new(Node {
+            value,
+            left: None,
+            right: None,
+        });
+        PersistentList {
+            left: Some(node.clone()),
+            right: Some(node),
+        }
+    }
+
+    pub fn cons(&self, value: T) -> Self {
+        let new_node = Rc::new(Node {
+            value,
+            left: None,
+            right: self.left.clone(),
+        });
+        PersistentList {
+            left: Some(new_node),
+            right: self.right.clone(),
+        }
+    }
+
+    pub fn head(&self) -> Option<&T> {
+        self.left.as_ref().map(|node| &node.value)
+    }
+
+    pub fn tail(&self) -> Self {
+        if self.left.as_ref() == self.right.as_ref() {
+            PersistentList::new()
+        } else {
+            let right_node = self.right.as_ref().unwrap();
+            PersistentList {
+                left: right_node.left.clone(),
+                right: right_node.right.clone(),
+            }
+        }
+    }
+
+    pub fn catenate(&self, other: &Self) -> Self {
+        if let Some(left_node) = &self.right {
+            if let Some(right_node) = &other.left {
+                if Rc::ptr_eq(left_node, right_node) {
+                    return PersistentList {
+                        left: self.left.clone(),
+                        right: other.right.clone(),
+                    };
+                }
+            }
+        }
+        let new_node = Rc::new(Node {
+            value: Default::default(),
+            left: self.right.clone(),
+            right: other.left.clone(),
+        });
+        PersistentList {
+            left: self.left.clone(),
+            right: other.right.clone(),
+        }
     }
 }
