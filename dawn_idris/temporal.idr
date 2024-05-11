@@ -168,3 +168,54 @@ retroactiveUpdate ((t, x) :: xs) t' x' = updateElem t t' x' :: retroactiveUpdate
   where
     updateElem : Int -> Int -> a -> (Int, a)
     updateElem t t' x' = if t <= t' then (t, x') else (t, x)
+
+
+
+-- Simple Confluently Persistent Catenable Lists, Tarjan et al
+module PersistentList
+
+public export
+data PersistentList : Type -> Type where
+  Nil : PersistentList a
+  Cons : (value : a) -> (left : PersistentList a) -> (right : PersistentList a) -> PersistentList a
+
+public export
+isEmpty : PersistentList a -> Bool
+isEmpty Nil = True
+isEmpty _ = False
+
+public export
+singleton : a -> PersistentList a
+singleton value = Cons value Nil Nil
+
+public export
+cons : a -> PersistentList a -> PersistentList a
+cons value list = Cons value Nil list
+
+public export
+head : PersistentList a -> Maybe a
+head Nil = Nothing
+head (Cons value _ _) = Just value
+
+public export
+tail : PersistentList a -> PersistentList a
+tail Nil = Nil
+tail (Cons _ Nil Nil) = Nil
+tail (Cons _ left right) = catenate left right
+
+public export
+catenate : PersistentList a -> PersistentList a -> PersistentList a
+catenate Nil ys = ys
+catenate xs Nil = xs
+catenate xs@(Cons _ _ Nil) ys = catenateHelper xs ys
+catenate xs ys@(Cons _ Nil _) = catenateHelper ys xs
+catenate xs@(Cons _ xl xr) ys@(Cons _ yl yr) =
+  if xr == yl
+    then Cons (head xr) xl yr
+    else catenateHelper xs ys
+
+private
+catenateHelper : PersistentList a -> PersistentList a -> PersistentList a
+catenateHelper Nil ys = ys
+catenateHelper xs Nil = xs
+catenateHelper xs@(Cons value xl xr) ys = Cons value xl (catenateHelper xr ys)
