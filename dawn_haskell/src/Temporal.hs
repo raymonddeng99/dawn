@@ -141,3 +141,61 @@ retroactiveUpdate :: Ord a => PQueue a -> Int -> a -> PQueue a
 retroactiveUpdate (PQueue data time) t x = PQueue data' time
   where
     data' = map (\(v, t') -> if t' <= t then (x, t') else (v, t')) data
+
+
+-- Simple Confluently Persistent Catenable Lists, Tarjan et al
+module PersistentList
+  ( PersistentList
+  , empty
+  , isEmpty
+  , singleton
+  , cons
+  , head
+  , tail
+  , catenate
+  ) where
+
+data Node a = Node a (PersistentList a) (PersistentList a)
+data PersistentList a = Nil | Cons (Node a)
+
+empty :: PersistentList a
+empty = Nil
+
+isEmpty :: PersistentList a -> Bool
+isEmpty Nil = True
+isEmpty _   = False
+
+singleton :: a -> PersistentList a
+singleton x = Cons (Node x Nil Nil)
+
+cons :: a -> PersistentList a -> PersistentList a
+cons x Nil = singleton x
+cons x (Cons n@(Node _ Nil Nil)) = Cons (Node x Nil (Cons n))
+cons x (Cons (Node v l r)) = Cons (Node x Nil (Cons (Node v l r)))
+
+head :: PersistentList a -> Maybe a
+head Nil = Nothing
+head (Cons (Node x _ _)) = Just x
+
+tail :: PersistentList a -> PersistentList a
+tail Nil = Nil
+tail (Cons (Node _ Nil Nil)) = Nil
+tail (Cons (Node _ l r)) = catenate l r
+
+catenate :: PersistentList a -> PersistentList a -> PersistentList a
+catenate Nil ys = ys
+catenate xs Nil = xs
+catenate xs@(Cons (Node _ _ Nil)) ys = xs `catenateHelp` ys
+catenate xs ys@(Cons (Node _ Nil _)) = ys `catenateHelp` xs
+catenate xs@(Cons (Node _ xl xr)) ys@(Cons (Node _ yl yr))
+  | xr == yl  = Cons (Node (nodeValue xr) xl yr)
+  | otherwise = xs `catenateHelp` ys
+
+catenateHelp :: PersistentList a -> PersistentList a -> PersistentList a
+catenateHelp Nil ys = ys
+catenateHelp xs Nil = xs
+catenateHelp xs@(Cons (Node x xl xr)) ys =
+  Cons (Node x xl (catenateHelp xr ys))
+
+nodeValue :: PersistentList a -> a
+nodeValue (Cons (Node x _ _)) = x
