@@ -197,3 +197,54 @@ func (pq *PQueue) RetroactiveUpdate(t int, x interface{}) {
 	pq.retroData = pq.retroData[:0]
 	heap.Init(&pq.data)
 }
+
+
+// Simple Confluently Persistent Catenable Lists, Tarjan et al
+type node struct {
+	value interface{}
+	left  *node
+	right *node
+}
+
+type PersistentList struct {
+	left  *node
+	right *node
+}
+
+func (l *PersistentList) IsEmpty() bool {
+	return l.left == nil && l.right == nil
+}
+
+func (l *PersistentList) Head() interface{} {
+	if l.left != nil {
+		return l.left.value
+	}
+	return nil
+}
+
+func (l *PersistentList) Tail() *PersistentList {
+	if l.left == l.right {
+		return &PersistentList{}
+	}
+	if l.right != nil {
+		return &PersistentList{left: l.right.left, right: l.right.right}
+	}
+	return &PersistentList{}
+}
+
+func (l *PersistentList) Catenate(other *PersistentList) *PersistentList {
+	if l.right == other.left {
+		return &PersistentList{left: l.left, right: other.right}
+	}
+	newNode := &node{value: nil, left: l.right, right: other.left}
+	return &PersistentList{left: l.left, right: other.right}
+}
+
+func (l *PersistentList) Cons(value interface{}) *PersistentList {
+	newNode := &node{value: value, left: nil, right: l.left}
+	return &PersistentList{left: newNode, right: l.right}
+}
+
+func NewPersistentList() *PersistentList {
+	return &PersistentList{}
+}
