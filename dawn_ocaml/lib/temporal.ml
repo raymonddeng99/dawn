@@ -132,3 +132,55 @@ module PriorityQueue = struct
     let data' = List.map (fun (v, t') -> if t' <= t then (x, t') else (v, t')) q.data in
     { q with data = data' }
 end
+
+(* Simple Confluently Persistent Catenable Lists, Tarjan et al *)
+module Persistent_List = struct
+  type 'a node = {
+    mutable value : 'a;
+    mutable left : 'a node option;
+    mutable right : 'a node option;
+  }
+
+  type 'a t = {
+    left : 'a node option;
+    right : 'a node option;
+  }
+
+  let empty = { left = None; right = None }
+
+  let is_empty list = list.left = None && list.right = None
+
+  let make_node value left right =
+    { value; left; right }
+
+  let catenate left right =
+    match left.right, right.left with
+    | Some x, Some y when x == y ->
+       { left = left.left; right = right.right }
+    | _, _ ->
+       let node = make_node (None, None) left.right right.left in
+       { left = left.left; right = right.right; }
+
+  let singleton value =
+    let node = make_node value None None in
+    { left = Some node; right = Some node }
+
+  let cons value list =
+    let node = make_node value None list.left in
+    { left = Some node; right = list.right }
+
+  let head list =
+    match list.left with
+    | Some node -> Some node.value
+    | None -> None
+
+  let tail list =
+    match list.left, list.right with
+    | Some node, Some right_node when node == right_node -> empty
+    | _, Some right_node ->
+       { left = (match right_node.left with
+                 | Some node -> Some node
+                 | None -> None);
+         right = right_node.right }
+    | _, None -> empty
+end
