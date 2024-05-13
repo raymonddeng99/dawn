@@ -31,3 +31,49 @@ module CompactSuffixArray = struct
     done;
     Array.sort (fun i j -> compare rank.(i) rank.(j)) (Array.init n (fun i -> i))
 end
+
+(* Succinct static data structures, Jacobsen '89 *)
+module BitVector = struct
+  let k = 6
+
+  let rank_naive bits i =
+    let rec aux j cnt =
+      if j > i then cnt
+      else aux (j + 1) (cnt + if List.nth bits j then 1 else 0)
+    in
+    aux 0 0
+
+  let select_naive bits i =
+    let rec aux j cnt =
+      if cnt = i then j
+      else if j >= List.length bits then -1
+      else aux (j + 1) (cnt + if List.nth bits j then 1 else 0)
+    in
+    aux 0 0
+
+  let create bits =
+    let n = List.length bits in
+    let rank_table = Array.make (n + 1) 0 in
+    let select_table = Array.make (n + 1) (-1) in
+    for i = 0 to n do
+      rank_table.(i) <-
+        if i mod (1 lsl k) = 0 then 0
+        else rank_table.(i - (i mod (1 lsl k))) + rank_naive bits i - rank_naive bits (i - (i mod (1 lsl k)));
+      select_table.(i) <-
+        if i mod (1 lsl k) = 0 then -1
+        else select_table.(i - (i mod (1 lsl k))) + select_naive bits i - select_naive bits (i - (i mod (1 lsl k)))
+    done;
+    (bits, rank_table, select_table)
+
+  let rank (bits, rank_table, _) i = rank_table.(i)
+
+  let select (bits, _, select_table) i =
+    let rec aux l r =
+      if l > r then -1
+      else
+        let m = l + (r - l) / 2 in
+        if rank (bits, rank_table, select_table) m < i then aux (m + 1) r
+        else aux l (m - 1)
+    in
+    aux 0 (List.length bits)
+end
